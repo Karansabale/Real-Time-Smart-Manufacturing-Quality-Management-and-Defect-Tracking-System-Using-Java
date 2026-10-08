@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inspections · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Inspections</h1>
+      <p class="text-secondary small mb-0">Every check the quality function performed, and what it found.</p>
+    </div>
+    <button class="btn btn-primary d-none" id="btn-new" data-role="INSPECTOR">+ New Inspection</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4 col-lg-3">
+          <label class="form-label small mb-1" for="f-product">Product</label>
+          <select class="form-select form-select-sm" id="f-product"></select>
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label small mb-1" for="f-from">From</label>
+          <input type="date" class="form-control form-control-sm" id="f-from">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label small mb-1" for="f-to">To</label>
+          <input type="date" class="form-control form-control-sm" id="f-to">
+        </div>
+        <div class="col-md-2 col-lg-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Date</th><th>Product</th><th>Batch</th><th>Type</th>
+              <th class="text-end">Inspected</th><th class="text-end">Rejected</th><th class="text-end">Accepted</th>
+              <th>Result</th><th>Inspector</th><th class="text-end">Actions</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<div class="modal fade" id="inspection-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="inspection-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Record an inspection</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="form-message"></div>
+          <div class="row g-3">
+            <div class="col-md-7">
+              <label class="form-label" for="i-product">Product <span class="text-danger">*</span></label>
+              <select class="form-select" id="i-product" required></select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="i-batch">Batch</label>
+              <select class="form-select" id="i-batch"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="i-type">Inspection type <span class="text-danger">*</span></label>
+              <select class="form-select" id="i-type" required>
+                <option value="INCOMING">Incoming material</option>
+                <option value="IN_PROCESS">In process</option>
+                <option value="FINAL">Final</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="i-inspected">Quantity inspected <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="i-inspected" min="1" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="i-rejected">Quantity rejected <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="i-rejected" min="0" value="0" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="i-result">Result <span class="text-danger">*</span></label>
+              <select class="form-select" id="i-result" required>
+                <option value="PASS">Pass</option>
+                <option value="FAIL">Fail</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="i-remarks">Remarks</label>
+              <textarea class="form-control" id="i-remarks" rows="2" maxlength="500"></textarea>
+            </div>
+            <div class="col-12 d-none" id="pass-with-rejects-box">
+              <div class="alert alert-warning mb-0">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="i-confirm">
+                  <label class="form-check-label" for="i-confirm">
+                    I confirm this inspection passed even though some units were rejected (FR-05.9).
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save inspection</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="remarks-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="remarks-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Edit remarks</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="remarks-message"></div>
+          <p class="small text-secondary">
+            Only the remarks can change. Quantities and results are part of the quality record (FR-05.12).
+          </p>
+          <textarea class="form-control" id="r-remarks" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save remarks</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   inspections.html — screen 6 of 10 (FR-05).
+   An inspector records what was checked and what it found. Two rules get
+   attention here:
+     · accepted quantity is never typed in - it is inspected minus rejected,
+       computed by the server so it can never disagree (FR-05.5)
+     · a PASS with rejects needs an explicit confirmation (FR-05.9)
+   A FAIL row offers "Register defect", carrying the product, batch and
+   inspection across to the defects screen so nothing is retyped (FR-06.2).
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const isInspector = me.role === 'INSPECTOR';
+  const table = Layout.table('rows', 'pager-footer', 10);
+  const modal = new bootstrap.Modal(document.getElementById('inspection-modal'));
+  const remarksModal = new bootstrap.Modal(document.getElementById('remarks-modal'));
+  let lastList = [];
+  let remarksTarget = null;
+
+  if (isInspector) document.getElementById('btn-new').classList.remove('d-none');
+
+  const products = await API.get('/api/products');
+  Layout.fillSelect(document.getElementById('f-product'),
+    products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'All products');
+  Layout.fillSelect(document.getElementById('i-product'),
+    products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'Choose a product...');
+  Layout.fillSelect(document.getElementById('i-batch'), [], '', 'No batch');
+
+  ['f-product', 'f-from', 'f-to'].forEach(id => document.getElementById(id).addEventListener('change', load));
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    ['f-product', 'f-from', 'f-to'].forEach(id => document.getElementById(id).value = '');
+    load();
+  });
+  document.getElementById('i-product').addEventListener('change', async () => {
+    const batches = await API.get('/api/batches?productId=' + document.getElementById('i-product').value);
+    Layout.fillSelect(document.getElementById('i-batch'),
+      batches.map(b => ({ value: b.batchId, label: b.batchNumber })), '', 'No batch');
+  });
+  ['i-inspected', 'i-rejected', 'i-result'].forEach(id =>
+    document.getElementById(id).addEventListener('input', checkPassWithRejects));
+  document.getElementById('i-result').addEventListener('change', checkPassWithRejects);
+
+  document.getElementById('btn-new').addEventListener('click', () => {
+    document.getElementById('inspection-form').reset();
+    document.getElementById('form-message').innerHTML = '';
+    document.getElementById('pass-with-rejects-box').classList.add('d-none');
+    Layout.fillSelect(document.getElementById('i-batch'), [], '', 'No batch');
+    modal.show();
+  });
+  document.getElementById('inspection-form').addEventListener('submit', save);
+  document.getElementById('rows').addEventListener('click', onRowClick);
+  document.getElementById('remarks-form').addEventListener('submit', saveRemarks);
+
+  await load();
+
+  function checkPassWithRejects() {
+    const status = document.getElementById('i-result').value;
+    const rejected = Number(document.getElementById('i-rejected').value || 0);
+    const show = status === 'PASS' && rejected > 0;
+    document.getElementById('pass-with-rejects-box').classList.toggle('d-none', !show);
+    if (!show) document.getElementById('i-confirm').checked = false;
+  }
+
+  async function load() {
+    Layout.clearMessage();
+    const query = new URLSearchParams();
+    if (document.getElementById('f-product').value) query.set('productId', document.getElementById('f-product').value);
+    else {
+      if (document.getElementById('f-from').value) query.set('from', document.getElementById('f-from').value);
+      if (document.getElementById('f-to').value) query.set('to', document.getElementById('f-to').value);
+    }
+    try {
+      lastList = await API.get('/api/inspections' + (query.toString() ? '?' + query : ''));
+      table.setRows(lastList.map(row));
+    } catch (error) { Layout.showError(error); }
+  }
+
+  function row(i) {
+    const failed = i.result === 'FAIL';
+    const mine = isInspector && i.inspector === me.fullName;
+    const actions =
+      '<div class="btn-group btn-group-sm">' +
+      (failed ? '<a class="btn btn-outline-danger" href="defects.html?new=1&productId=' + i.productId +
+        (i.batchId ? '&batchId=' + i.batchId : '') + '&inspectionId=' + i.inspectionId + '">Register defect</a>' : '') +
+      (mine ? '<button class="btn btn-outline-secondary" data-remarks="' + i.inspectionId + '">Remarks</button>' : '') +
+      (!failed && !mine ? '<span class="text-secondary small">—</span>' : '') +
+      '</div>';
+
+    return '<tr>' +
+      '<td>' + Layout.dateTime(i.inspectionDate) + '</td>' +
+      '<td>' + Layout.esc(i.productCode) + '</td>' +
+      '<td>' + Layout.esc(i.batchNumber || '—') + '</td>' +
+      '<td>' + Layout.esc(i.inspectionType.replaceAll('_', ' ')) + '</td>' +
+      '<td class="text-end">' + i.inspectedQty + '</td>' +
+      '<td class="text-end">' + i.rejectedQty + '</td>' +
+      '<td class="text-end">' + i.acceptedQty + '</td>' +
+      '<td><span class="badge ' + (i.result === 'PASS' ? 'text-bg-success' : 'text-bg-danger') + '">' + i.result + '</span>' +
+        (i.result === 'PASS' && i.rejectedQty > 0 ? ' <span class="badge text-bg-warning">with rejects</span>' : '') + '</td>' +
+      '<td>' + Layout.esc(i.inspector) + '</td>' +
+      '<td class="text-end">' + actions + '</td></tr>';
+  }
+
+  function onRowClick(event) {
+    const button = event.target.closest('[data-remarks]');
+    if (!button) return;
+    const id = Number(button.dataset.remarks);
+    remarksTarget = lastList.find(i => i.inspectionId === id);
+    if (!remarksTarget) return;
+    document.getElementById('remarks-message').innerHTML = '';
+    document.getElementById('r-remarks').value = remarksTarget.remarks || '';
+    remarksModal.show();
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    const form = document.getElementById('inspection-form');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    const inspected = Number(document.getElementById('i-inspected').value);
+    const rejected = Number(document.getElementById('i-rejected').value);
+    const status = document.getElementById('i-result').value;
+
+    if (rejected > inspected) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">You cannot reject more units than you inspected (FR-05.3).</div>';
+      return;
+    }
+    if (status === 'PASS' && rejected > 0 && !document.getElementById('i-confirm').checked) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">Please confirm that this inspection passed although some units were rejected (FR-05.9).</div>';
+      return;
+    }
+
+    const body = {
+      productId: Number(document.getElementById('i-product').value),
+      batchId: document.getElementById('i-batch').value ? Number(document.getElementById('i-batch').value) : null,
+      inspectionType: document.getElementById('i-type').value,
+      inspectedQty: inspected,
+      rejectedQty: rejected,
+      result: status,
+      remarks: document.getElementById('i-remarks').value.trim() || null,
+      confirmPassWithRejects: document.getElementById('i-confirm').checked
+    };
+
+    try {
+      await API.post('/api/inspections', body);
+      modal.hide();
+      Layout.showMessage('Inspection recorded. Accepted quantity is ' + (inspected - rejected) + '.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">' + Layout.esc(error.message) +
+        (error.details && error.details.length ? '<ul class="mb-0 mt-1">' +
+          error.details.map(x => '<li>' + Layout.esc(x) + '</li>').join('') + '</ul>' : '') + '</div>';
+    }
+  }
+
+  async function saveRemarks(event) {
+    event.preventDefault();
+    try {
+      await API.put('/api/inspections/' + remarksTarget.inspectionId + '/remarks',
+        { remarks: document.getElementById('r-remarks').value.trim() || null });
+      remarksModal.hide();
+      Layout.showMessage('Remarks updated.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('remarks-message').innerHTML =
+        '<div class="alert alert-danger">' + Layout.esc(error.message) + '</div>';
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

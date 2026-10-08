@@ -1,0 +1,155 @@
+# ============================================================================
+#  Real-Time Smart Manufacturing Quality Management and Defect Tracking System
+# ============================================================================
+#  File     : backend/src/main/resources/application.properties.sample
+#  Purpose  : Template configuration file. COMMIT THIS FILE TO GIT.
+#
+#  HOW TO USE:
+#    1. Copy this file to  application.properties   in the same folder.
+#    2. Replace every value marked  <<CHANGE_ME>>  with your own.
+#    3. NEVER commit application.properties to Git — it contains your real
+#       database password (Phase 4, NFR-02.5). It is already listed in
+#       .gitignore.
+#
+#  Each setting below explains WHAT it does and WHY it is set this way,
+#  because every one of these is a likely viva question.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# 1. SERVER
+# ----------------------------------------------------------------------------
+# Port 8080 is the Spring Boot default. The application will be reachable at
+#   http://localhost:8080
+server.port=8080
+
+# Show a helpful error page instead of a blank one during development.
+server.error.include-message=always
+server.error.include-binding-errors=always
+
+# Do NOT send stack traces to the browser (Phase 4, NFR-02.7, FR-12.9).
+# "never" is the secure setting and stays correct even in the final build.
+server.error.include-stacktrace=never
+
+
+# ----------------------------------------------------------------------------
+# 2. SESSION
+# ----------------------------------------------------------------------------
+# Log the user out automatically after 30 minutes of inactivity
+# (Phase 4, NFR-02.8).
+server.servlet.session.timeout=30m
+
+# The session cookie cannot be read by JavaScript. This blocks a whole class
+# of session-stealing attacks for one line of configuration.
+server.servlet.session.cookie.http-only=true
+
+# SameSite=Lax prevents another website from silently reusing this session.
+server.servlet.session.cookie.same-site=lax
+
+
+# ----------------------------------------------------------------------------
+# 3. DATABASE CONNECTION
+# ----------------------------------------------------------------------------
+# The JDBC URL has three query parameters, each fixing a real, common problem:
+#
+#   useSSL=false
+#       Local development MySQL usually has no TLS certificate. Leaving this
+#       on produces a long, alarming SSL warning on every startup.
+#
+#   allowPublicKeyRetrieval=true
+#       MySQL 8.4 uses caching_sha2_password by default. Without this flag the
+#       driver may fail with "Public Key Retrieval is not allowed" on a
+#       non-SSL connection. This is the single most common student setup error.
+#
+#   serverTimezone=Asia/Kolkata
+#       Makes MySQL and Java agree on the time zone, so timestamps are not
+#       shifted by 5:30. Change this if you are not in India.
+#
+spring.datasource.url=jdbc:mysql://localhost:3306/manufacturing_qms?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
+
+# The dedicated application user created in database/00_create_database.sql.
+# Do not use the MySQL "root" account — see Phase 6 section 10.3 for why.
+spring.datasource.username=qms_user
+spring.datasource.password=<<CHANGE_ME>>
+
+# Explicit driver class name. Spring Boot can usually detect this, but being
+# explicit makes a misconfiguration fail with a clear message instead of a
+# confusing one.
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# Connection pool (HikariCP, bundled with Spring Boot).
+# A small manufacturing unit has a handful of users, so a small pool is
+# correct. See Phase 4, NFR-04.5.
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.connection-timeout=20000
+
+
+# ----------------------------------------------------------------------------
+# 4. JPA / HIBERNATE
+# ----------------------------------------------------------------------------
+# ddl-auto=validate  <-- THIS IS THE MOST IMPORTANT SETTING IN THIS FILE.
+#
+#   validate : Hibernate checks that every @Entity matches the real table and
+#              fails at startup if it does not. It NEVER changes your schema.
+#
+#   update   : Hibernate silently alters your tables to match your entities.
+#              DO NOT USE THIS. It hides mistakes instead of reporting them,
+#              and it is how students end up with columns they never intended
+#              and cannot explain in the viva.
+#
+#   create   : Drops and recreates every table on each start. DESTROYS DATA.
+#
+# We use validate because Phase 7 deliberately designs the schema by hand in
+# SQL (satisfying SR-12 and NFR-05.5). The database is the source of truth,
+# and Hibernate's job is only to check that the Java code agrees with it.
+spring.jpa.hibernate.ddl-auto=validate
+
+# Print the SQL Hibernate generates. Very useful while learning; set to false
+# before recording your demo video so the console stays readable.
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Explicit dialect, so Hibernate generates MySQL-specific SQL.
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+
+# open-in-view=false is a deliberate choice.
+#
+#   true (the default) keeps the database session open while the page renders.
+#   It hides lazy-loading mistakes: code that looks like it works actually
+#   fires extra database queries behind your back.
+#
+#   false forces every needed piece of data to be fetched inside the service
+#   method, on purpose. It is slightly more work while writing code and
+#   considerably better practice. Being able to explain this setting is a
+#   genuine plus in a viva.
+spring.jpa.open-in-view=false
+
+# Batch inserts/deletes, so saving many rows in one transaction is efficient.
+spring.jpa.properties.hibernate.jdbc.batch_size=20
+spring.jpa.properties.hibernate.order_inserts=true
+spring.jpa.properties.hibernate.order_updates=true
+
+
+# ----------------------------------------------------------------------------
+# 5. JSON OUTPUT
+# ----------------------------------------------------------------------------
+# Write dates as readable ISO-8601 text ("2026-10-07T14:30:00") rather than as
+# a large number of milliseconds since 1970. The frontend can display the text
+# directly, and Postman responses stay readable.
+spring.jackson.serialization.write-dates-as-timestamps=false
+
+
+# ----------------------------------------------------------------------------
+# 6. LOGGING
+# ----------------------------------------------------------------------------
+logging.level.root=INFO
+logging.level.com.project.qms=DEBUG
+
+# Show the SQL parameters bound to each query. Extremely useful when a filter
+# returns the wrong rows. Set to WARN before the final demo.
+logging.level.org.hibernate.SQL=INFO
+logging.level.org.hibernate.orm.jdbc.bind=TRACE
+
+# Write logs to a file as well as the console (supports SR-21).
+logging.file.name=logs/manufacturing-qms.log

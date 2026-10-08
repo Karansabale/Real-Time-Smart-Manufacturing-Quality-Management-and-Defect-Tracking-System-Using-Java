@@ -1,0 +1,61 @@
+# ============================================================================
+#  .gitignore
+#  Files Git must NEVER track. Committed to the repository root.
+#  Rule: anything containing a password, anything generated, anything huge.
+# ============================================================================
+
+# ---------------------------------------------------------------- secrets ---
+# The real configuration file holds the database password. Only the .sample
+# template is committed (Phase 4, NFR-02.5; Phase 14).
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-*.properties
+!backend/src/main/resources/application.properties.sample
+
+# ------------------------------------------------------- build output ------
+target/
+build/
+out/
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+
+# ------------------------------------------------------- IDE files ---------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+nbproject/
+
+# ------------------------------------------------------- OS files ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------- test harness deps -------
+# Only frontend/tests needs these; the application itself has no npm packages.
+# node_modules is excluded, but package-lock.json IS committed: it is what makes
+# the browser tests install exactly the same versions on another machine.
+node_modules/
+
+# ------------------------------------------------------- logs --------------
+logs/
+*.log
+
+# ------------------------------------------------------- database dumps ----
+# Backups contain real data and can be very large. Keep them out of Git.
+*.sql.bak
+*.dump
+
+# ------------------------------------------------------- environment -------
+.env
+.env.local
+*.env
+
+# ------------------------------------------------------- other -------------
+*.tmp
+*.swp
+*~

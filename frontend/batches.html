@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production Batches · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Production Batches</h1>
+      <p class="text-secondary small mb-0">What was made, when, and on which line. Defects are tied to these batches.</p>
+    </div>
+    <button class="btn btn-primary d-none" id="btn-new" data-role="SUPERVISOR">+ Create Batch</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small mb-1" for="f-product">Product</label>
+          <select class="form-select form-select-sm" id="f-product"></select>
+        </div>
+        <div class="col-md-6 col-lg-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Batch number</th><th>Product</th><th class="text-end">Quantity</th><th>Production line</th>
+              <th>Started</th><th>Completed</th><th>Status</th><th class="text-end">Actions</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<div class="modal fade" id="batch-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="batch-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Create a production batch</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="form-message"></div>
+          <div class="row g-3">
+            <div class="col-md-7">
+              <label class="form-label" for="b-product">Product <span class="text-danger">*</span></label>
+              <select class="form-select" id="b-product" required></select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="b-number">Batch number <span class="text-danger">*</span></label>
+              <input class="form-control" id="b-number" maxlength="30" required placeholder="BATCH-2026-011">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="b-qty">Quantity produced <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="b-qty" min="1" required>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="b-line">Production line <span class="text-danger">*</span></label>
+              <input class="form-control" id="b-line" maxlength="30" required placeholder="e.g. Assembly Line 3">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="b-start">Start date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="b-start" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="b-end">End date</label>
+              <input type="date" class="form-control" id="b-end">
+              <div class="form-text">Filled in automatically when the batch is marked completed.</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create batch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="status-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form id="status-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Update status</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="status-message"></div>
+          <p class="small text-secondary mb-3" id="status-batch"></p>
+          <select class="form-select" id="s-status" required>
+            <option value="PLANNED">Planned</option>
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   batches.html — screen 5 of 10 (FR-04).
+   A Production Supervisor creates batches and moves them through PLANNED →
+   IN_PROGRESS → COMPLETED. Completing a batch records its end date (FR-04.7).
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const isSupervisor = me.role === 'SUPERVISOR';
+  const table = Layout.table('rows', 'pager-footer', 8);
+  const batchModal = new bootstrap.Modal(document.getElementById('batch-modal'));
+  const statusModal = new bootstrap.Modal(document.getElementById('status-modal'));
+  let products = [];
+  let lastList = [];          // the batches as last loaded, for row lookups
+  let statusBatch = null;
+
+  if (isSupervisor) document.getElementById('btn-new').classList.remove('d-none');
+
+  const batches = await API.get('/api/batches');
+  products = await API.get('/api/products');
+  Layout.fillSelect(document.getElementById('f-product'),
+    products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'All products');
+  Layout.fillSelect(document.getElementById('b-product'),
+    products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'Choose a product...');
+
+  document.getElementById('btn-new').addEventListener('click', () => {
+    document.getElementById('batch-form').reset();
+    document.getElementById('form-message').innerHTML = '';
+    document.getElementById('b-start').value = new Date().toISOString().slice(0, 10);
+    batchModal.show();
+  });
+  document.getElementById('f-product').addEventListener('change', load);
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    document.getElementById('f-product').value = ''; load();
+  });
+  document.getElementById('rows').addEventListener('click', onRowClick);
+  document.getElementById('batch-form').addEventListener('submit', create);
+  document.getElementById('status-form').addEventListener('submit', saveStatus);
+
+  await load();
+
+  async function load() {
+    Layout.clearMessage();
+    const productId = document.getElementById('f-product').value;
+    try {
+      lastList = await API.get('/api/batches' + (productId ? '?productId=' + productId : ''));
+      table.setRows(lastList.map(row));
+    } catch (error) { Layout.showError(error); }
+  }
+
+  function row(b) {
+    return '<tr>' +
+      '<td class="fw-semibold">' + Layout.esc(b.batchNumber) + '</td>' +
+      '<td>' + Layout.esc(b.productCode) + ' <span class="text-secondary small d-none d-xl-inline">' + Layout.esc(b.productName) + '</span></td>' +
+      '<td class="text-end">' + b.quantityProduced + '</td>' +
+      '<td>' + Layout.esc(b.productionLine) + '</td>' +
+      '<td>' + Layout.date(b.startDate) + '</td>' +
+      '<td>' + Layout.date(b.endDate) + '</td>' +
+      '<td><span class="badge ' + (b.productionStatus === 'COMPLETED' ? 'text-bg-success'
+          : b.productionStatus === 'IN_PROGRESS' ? 'text-bg-primary' : 'text-bg-secondary') + '">' +
+          b.productionStatus.replaceAll('_', ' ') + '</span></td>' +
+      '<td class="text-end">' + (isSupervisor
+        ? '<button class="btn btn-sm btn-outline-secondary" data-status="' + b.batchId + '">Update status</button>'
+        : '<span class="text-secondary small">—</span>') + '</td></tr>';
+  }
+
+  function onRowClick(event) {
+    const button = event.target.closest('[data-status]');
+    if (!button) return;
+    const id = Number(button.dataset.status);
+    statusBatch = lastList.find(b => b.batchId === id) || null;
+    if (!statusBatch) return;
+    document.getElementById('status-message').innerHTML = '';
+    document.getElementById('status-batch').textContent = statusBatch.batchNumber + ' - ' + statusBatch.productCode;
+    document.getElementById('s-status').value = statusBatch.productionStatus;
+    statusModal.show();
+  }
+
+  async function create(event) {
+    event.preventDefault();
+    const form = document.getElementById('batch-form');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    const body = {
+      productId: Number(document.getElementById('b-product').value),
+      batchNumber: document.getElementById('b-number').value.trim(),
+      quantityProduced: Number(document.getElementById('b-qty').value),
+      productionLine: document.getElementById('b-line').value.trim(),
+      startDate: document.getElementById('b-start').value,
+      endDate: document.getElementById('b-end').value || null
+    };
+
+    try {
+      await API.post('/api/batches', body);
+      batchModal.hide();
+      Layout.showMessage('Batch created as PLANNED.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">' + Layout.esc(error.message) + '</div>';
+    }
+  }
+
+  async function saveStatus(event) {
+    event.preventDefault();
+    try {
+      await API.put('/api/batches/' + statusBatch.batchId + '/status',
+        { productionStatus: document.getElementById('s-status').value });
+      statusModal.hide();
+      Layout.showMessage('Batch status updated.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('status-message').innerHTML =
+        '<div class="alert alert-danger">' + Layout.esc(error.message) + '</div>';
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

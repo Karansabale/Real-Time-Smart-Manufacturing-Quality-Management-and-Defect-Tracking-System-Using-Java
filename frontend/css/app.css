@@ -1,0 +1,100 @@
+/* ============================================================================
+   app.css — the small amount of styling that Bootstrap does not give us.
+   Bootstrap 5 does the layout, the forms, the modals and the tables.
+   What lives here is only the project's own vocabulary:
+     · status and severity colours (Phase 5 §10.3 — one colour vocabulary)
+     · the overdue highlight
+     · the status timeline on the defect detail screen
+     · the empty-state block (FR-10.11)
+     · the print stylesheet for reports (FR-10.9)
+   ========================================================================= */
+
+body { background-color: #f6f7f9; }
+
+.navbar-brand { letter-spacing: .3px; }
+
+/* --- status badges (Phase 5 §10.3) ---------------------------------------
+   OPEN red "needs attention now" · UNDER_INVESTIGATION and CORRECTIVE_ACTION
+   amber "in progress" · VERIFIED blue "awaiting closure" · CLOSED green
+   "resolved". The same five colours are used on every screen.            */
+.badge.status-badge { font-weight: 600; letter-spacing: .3px; }
+.st-OPEN               { background-color: #dc3545; }
+.st-UNDER_INVESTIGATION{ background-color: #e8a33d; }
+.st-CORRECTIVE_ACTION  { background-color: #e8a33d; }
+.st-VERIFIED           { background-color: #0d6efd; }
+.st-CLOSED             { background-color: #198754; }
+
+/* --- severity badges ------------------------------------------------------
+   CRITICAL and HIGH red, MEDIUM amber, LOW green - the same three colours,
+   so a glance at a table tells you where the trouble is.                  */
+.badge.sev-badge { font-weight: 600; }
+.sev-CRITICAL, .sev-HIGH { background-color: #dc3545; }
+.sev-MEDIUM              { background-color: #e8a33d; }
+.sev-LOW                 { background-color: #198754; }
+
+/* --- progress / verification badges ------------------------------------- */
+.badge.prog-COMPLETED   { background-color: #198754; }
+.badge.prog-IN_PROGRESS { background-color: #0d6efd; }
+.badge.prog-PENDING     { background-color: #6c757d; }
+.badge.ver-EFFECTIVE      { background-color: #198754; }
+.badge.ver-NOT_EFFECTIVE  { background-color: #dc3545; }
+.badge.ver-PENDING        { background-color: #6c757d; }
+
+/* --- overdue corrective actions (FR-08.8) -------------------------------- */
+tr.overdue { background-color: #fff4f4; }
+tr.overdue td { border-color: #f5c2c2; }
+.text-overdue { color: #b02a37; font-weight: 600; }
+
+/* --- the summary tiles on the dashboard --------------------------------- */
+.tile { border-radius: .6rem; }
+.tile .tile-number { font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
+.tile .tile-label  { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
+.tile.tile-open             { border-left: 4px solid #dc3545; }
+.tile.tile-under            { border-left: 4px solid #e8a33d; }
+.tile.tile-corrective       { border-left: 4px solid #e8a33d; }
+.tile.tile-verified         { border-left: 4px solid #0d6efd; }
+.tile.tile-closed           { border-left: 4px solid #198754; }
+.tile.tile-total            { border-left: 4px solid #212529; }
+
+/* --- the status timeline on defect-detail.html (FR-06.12) ---------------- */
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { position: relative; padding: 0 0 18px 22px; border-left: 2px solid #dee2e6; }
+.timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.timeline li::before {
+  content: ''; position: absolute; left: -7px; top: 2px;
+  width: 12px; height: 12px; border-radius: 50%; background: #0d6efd;
+}
+.timeline li.first::before { background: #212529; }
+.timeline .when { font-size: .8rem; color: #6c757d; }
+
+/* --- empty states (FR-10.11) -------------------------------------------- */
+.empty-state { text-align: center; padding: 44px 16px; color: #6c757d; }
+.empty-state .empty-title { font-size: 1.05rem; color: #495057; margin-bottom: 4px; }
+
+/* --- charts -------------------------------------------------------------- */
+.chart-box { position: relative; height: 260px; }
+
+/* --- small print helper -------------------------------------------------- */
+.small-caps { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
+
+/* ============================================================================
+   PRINT (FR-10.9)
+   Printing a report should produce the report: no navbar, no filters, no
+   buttons - just the title, the criteria used, the date and the table.
+   The print header itself is filled in by reports.html and is invisible
+   on screen.
+   ========================================================================= */
+#print-header { display: none; }
+
+@media print {
+  body { background: #fff; }
+  #app-navbar, .no-print, .btn, .alert { display: none !important; }
+  main.container { max-width: 100% !important; padding: 0 !important; }
+  #print-header { display: block; margin-bottom: 14px; }
+  #print-header h1 { font-size: 18px; margin: 0 0 2px 0; }
+  #print-header .meta { font-size: 12px; color: #444; }
+  .card { border: 0; box-shadow: none !important; }
+  table { font-size: 12px; }
+  thead { display: table-header-group; }   /* repeat the header on every page */
+  @page { margin: 14mm; }
+}

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  Real-Time Smart Manufacturing Quality Management and Defect Tracking System
+  ============================================================================
+  File        : backend/pom.xml
+  Purpose     : Maven build file. Declares the Java version and the six
+                libraries the project uses. Nothing more.
+  ============================================================================
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- =====================================================================
+         1. SPRING BOOT PARENT
+         Inheriting from the parent gives us: dependency version management,
+         the Spring Boot Maven plugin, and sensible compiler defaults.
+         We do NOT specify versions for most dependencies below — the parent
+         decides them, so they always stay mutually compatible.
+         ===================================================================== -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <!-- =====================================================================
+         2. PROJECT IDENTITY
+         ===================================================================== -->
+    <groupId>com.project</groupId>
+    <artifactId>manufacturing-qms</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Manufacturing QMS</name>
+    <description>Real-Time Smart Manufacturing Quality Management and Defect Tracking System</description>
+
+    <!-- =====================================================================
+         3. JAVA VERSION
+         Java 21 is an LTS release, supported to September 2028.
+         ===================================================================== -->
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <!-- =====================================================================
+         4. DEPENDENCIES  —  exactly six. See Phase 6 section 8.4 for why each
+         one is here and what it replaces.
+         ===================================================================== -->
+    <dependencies>
+
+        <!-- (1) Web layer: REST controllers, JSON, embedded Tomcat.
+                Gives us @RestController, @GetMapping, @PostMapping, etc. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- (2) Data access: Spring Data JPA + Hibernate.
+                Gives us @Entity, @Repository, JpaRepository, @Transactional. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- (3) Bean Validation: @NotNull, @Size, @Min, @Valid on DTOs.
+                Implements FR-12 (input validation and error handling). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- (4) MySQL JDBC driver. Scope "runtime" because we never write
+                JDBC code directly — Hibernate uses the driver internally,
+                so it is not needed at compile time. -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- (5) BCrypt password hashing, as a STANDALONE library.
+                IMPORTANT: this is spring-security-crypto, NOT
+                spring-boot-starter-security. The crypto jar gives us
+                BCryptPasswordEncoder (satisfying NFR-02.3) without
+                installing Spring Security's web filter chain, which would
+                otherwise block every endpoint until it is configured.
+                One class, no filter chain, no extra configuration. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <!-- (6) Testing: JUnit 5, AssertJ, Mockito, Spring Test.
+                Scope "test" — not packaged into the final JAR. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <!-- =====================================================================
+         5. BUILD PLUGINS
+         The Spring Boot plugin repackages the compiled classes into a single
+         executable JAR ("fat JAR") containing embedded Tomcat. That is what
+         makes `java -jar` able to start the whole application.
+         ===================================================================== -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

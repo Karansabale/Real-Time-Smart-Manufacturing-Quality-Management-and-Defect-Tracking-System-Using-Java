@@ -1,0 +1,72 @@
+
+--- JOURNEY 1 — Inspector: failed inspection → defect raised from it ---
+  PASS  the login form rendered and was usable  [01_login.png]
+  PASS  the dashboard rendered: six lifecycle tiles plus the two fixed ones  [#tiles=6, products=6, batches=10]
+  PASS  both charts actually drew (real canvas sizes, which jsdom cannot check)
+  PASS  the overdue strip states the number and the reason  [2 corrective actions overdue. The target date has passed and t]
+  PASS  page: list screen opened to rows on screen  [248 ms, gate 3000 ms]
+  PASS  the inspection list loaded from MySQL  [12 rows]
+  PASS  save: inspection form submitted to list refreshed  [625 ms, gate 2000 ms]
+  PASS  the new inspection was saved and appears in the list  [13 rows]
+  PASS  the FAIL row offers the direct link to raise a defect against the same product and batch  [defects.html?new=1&productId=1&batchId=6&inspectionId=13]
+  PASS  the defect form arrives pre-filled from the failed inspection  [product=1 batch=6 inspection=13]
+  PASS  the defect was created and the register now shows it  [11 rows, newest DEF-2026-0011]
+  PASS  the new defect opens with status OPEN and one history entry  [status=OPEN, timeline=1]
+  PASS  the Inspector is NOT offered the move to UNDER_INVESTIGATION (that is the Supervisor's step)  [0 move buttons offered]
+
+--- JOURNEY 2 — Supervisor: investigate and assign a corrective action ---
+  PASS  the Supervisor IS offered the next legal step  [Move to UNDER INVESTIGATION]
+  PASS  the move was accepted and the badge on the page changed  [UNDER_INVESTIGATION]
+  PASS  the timeline recorded the move, with the reason field offered  [2 entries]
+  PASS  the Supervisor is offered "Assign action"
+  PASS  the corrective action was recorded against the defect  [responsible people offered: 6]
+  PASS  now that an action exists, the Supervisor can move it on  [Move to CORRECTIVE ACTION|Move to OPEN]
+  PASS  the defect is now in CORRECTIVE_ACTION  [CORRECTIVE_ACTION]
+  PASS  the Inspector is NOT offered "Verify" while the action is still PENDING  [0 verify buttons]
+
+--- JOURNEY 3 — complete the action, verify it, close the defect ---
+  PASS  once the work is COMPLETED, the Inspector is offered "Verify"
+  PASS  with an effective action, the Inspector may move the defect to VERIFIED  [Move to VERIFIED]
+  PASS  the defect is VERIFIED  [VERIFIED]
+  PASS  and now CLOSED is the step offered  [Move to CLOSED|Move to CORRECTIVE ACTION]
+  PASS  the defect is CLOSED, and the timeline shows the whole journey  [5 entries]
+  PASS  the timeline names the people who moved it, not just the statuses
+  PASS  a closed defect offers no further moves, and Delete is withdrawn  [hint: "This defect is closed. A closed defect cannot be reopene"]
+
+--- JOURNEY 4 — Administrator: create an account, prove it works, deactivate it ---
+  PASS  the user list loaded for the Administrator
+  PASS  the new account appears in the list
+  PASS  the screen disables Deactivate on your own row, and the tooltip says why  ["You cannot deactivate your own account"]
+  PASS  and the server refuses it as well, even with the screen bypassed  [400: You cannot deactivate your own account. Ask another administrator to do it.]
+  PASS  the account created a moment ago can log in and see the dashboard  [6 lifecycle tiles]
+  PASS  a deactivated account cannot log in, and the message says so  [This account has been deactivated. Please contact the administrator.]
+
+--- JOURNEY 5 — cross-module consistency: dashboard vs list vs report ---
+  PASS  dashboard: opened to tiles and charts on screen  [645 ms, gate 3000 ms]
+  PASS  the dashboard reports the closed defect this journey created  [CLOSED = 2]
+  PASS  and the totals follow it  [total=11, open=2, closed=2]
+  PASS  the overdue strip counts them the same way the report will  ["2 corrective actions overdue. The target dat"]
+  PASS  the defect register report lists the same number of defects as the dashboard  [report 11 vs dashboard 11]
+  PASS  the printed report carries its own title, filters and generation time (FR-10.11)  [Manufacturing QMS — Defect register | 11 records   |   Status: all   |   Severity: all   |   Product: all | Generated 07-10-2026 13:03 by System Administr]
+  PASS  report: generate clicked to rows on screen  [256 ms, gate 5000 ms]
+  PASS  the overdue report produced rows  [2 rows]
+  PASS  the overdue report shows the same count as the dashboard strip  [report 2 vs dashboard 2]
+  PASS  and the overdue filter on the corrective actions screen agrees as well  [list 2 vs dashboard 2]
+  PASS  the report prints to a real A4 PDF (print CSS applied, not just claimed)  [67 KB]
+
+--- JOURNEY 6 — the session goes away while a screen is open ---
+  PASS  the browser is sent back to the login screen instead of showing empty tables  [/login.html]
+  PASS  opening a screen with no session at all also lands on the login  [/login.html]
+
+==================================================
+  Phase 10 integration journeys:  PASSED 47   FAILED 0
+==================================================
+
+  Phase 4 response-time gates, measured by this run:
+    pass  248 ms  (gate 3000 ms)  page: list screen opened to rows on screen
+    pass  625 ms  (gate 2000 ms)  save: inspection form submitted to list refreshed
+    pass  645 ms  (gate 3000 ms)  dashboard: opened to tiles and charts on screen
+    pass  256 ms  (gate 5000 ms)  report: generate clicked to rows on screen
+
+  confirmations answered during the run: 5
+

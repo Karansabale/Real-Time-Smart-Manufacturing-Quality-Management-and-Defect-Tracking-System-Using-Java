@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Defects · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Defects</h1>
+      <p class="text-secondary small mb-0">Every defect the quality function has recorded, with its current position in the lifecycle.</p>
+    </div>
+    <button class="btn btn-primary d-none" id="btn-new" data-role="INSPECTOR">+ New Defect</button>
+  </div>
+
+  <div id="message"></div>
+
+  <!-- Filter bar: between the title and the table, as on every screen (§10.2) -->
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label small mb-1" for="f-status">Status</label>
+          <select class="form-select form-select-sm" id="f-status"></select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label small mb-1" for="f-severity">Severity</label>
+          <select class="form-select form-select-sm" id="f-severity"></select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label small mb-1" for="f-product">Product</label>
+          <select class="form-select form-select-sm" id="f-product"></select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="f-unassigned">
+            <label class="form-check-label small" for="f-unassigned">
+              Only defects with no corrective action yet
+            </label>
+          </div>
+        </div>
+        <div class="col-lg-2 text-lg-end">
+          <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear filters</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Reference</th><th>Product</th><th>Batch</th><th>Category</th>
+            <th>Severity</th><th class="text-end">Units</th><th>Status</th>
+            <th class="text-end">Age</th><th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<!-- ===================== Register / edit a defect (FR-06) ================= -->
+<div class="modal fade" id="defect-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="defect-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="defect-modal-title">Register a defect</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="form-message"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="d-product">Product <span class="text-danger">*</span></label>
+              <select class="form-select" id="d-product" required></select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="d-batch">Production batch</label>
+              <select class="form-select" id="d-batch"></select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="d-inspection">Detected during inspection</label>
+              <select class="form-select" id="d-inspection"></select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="d-category">Category <span class="text-danger">*</span></label>
+              <select class="form-select" id="d-category" required>
+                <option value="DIMENSIONAL">Dimensional</option>
+                <option value="SURFACE_FINISH">Surface finish</option>
+                <option value="MATERIAL">Material</option>
+                <option value="ASSEMBLY">Assembly</option>
+                <option value="FUNCTIONAL">Functional</option>
+                <option value="PACKAGING">Packaging</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="d-description">Description <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="d-description" rows="3" minlength="10" maxlength="500" required
+                        placeholder="What is wrong, and where on the part? (at least 10 characters)"></textarea>
+              <div class="form-text">Write it so that somebody who was not there can picture the problem.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="d-severity">Severity <span class="text-danger">*</span></label>
+              <select class="form-select" id="d-severity" required>
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="d-units">Units affected <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="d-units" min="1" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save">Save defect</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   defects.html — screen 7 of 10 (FR-06).
+   The five filter boxes, the colour-coded table, and the defect form.
+   The filters are sent to the server rather than applied in the browser, so
+   what you see is exactly what the database contains.
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const canRegister = me.role === 'INSPECTOR';                    // FR-06.1, §6.2
+  const canDelete   = me.role === 'INSPECTOR' || me.role === 'ADMIN';
+
+  const table = Layout.table('rows', 'pager-footer', 9);
+  const modal = new bootstrap.Modal(document.getElementById('defect-modal'));
+  const form = document.getElementById('defect-form');
+  let editingId = null;
+  let products = [];
+
+  if (canRegister) document.getElementById('btn-new').classList.remove('d-none');
+
+  /* ---------- filter bar ------------------------------------------------ */
+  Layout.fillSelect(document.getElementById('f-status'),
+    ['OPEN', 'UNDER_INVESTIGATION', 'CORRECTIVE_ACTION', 'VERIFIED', 'CLOSED']
+      .map(s => ({ value: s, label: s.replaceAll('_', ' ') })), '', 'All statuses');
+  Layout.fillSelect(document.getElementById('f-severity'),
+    ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(s => ({ value: s, label: s })), '', 'All severities');
+
+  ['f-status', 'f-severity', 'f-product', 'f-unassigned'].forEach(id =>
+    document.getElementById(id).addEventListener('change', () => load()));
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    document.getElementById('f-status').value = '';
+    document.getElementById('f-severity').value = '';
+    document.getElementById('f-product').value = '';
+    document.getElementById('f-unassigned').checked = false;
+    load();
+  });
+
+  /* ---------- data ------------------------------------------------------ */
+  await loadProducts();
+  await load();
+
+  async function loadProducts() {
+    products = await API.get('/api/products');
+    Layout.fillSelect(document.getElementById('f-product'),
+      products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'All products');
+    Layout.fillSelect(document.getElementById('d-product'),
+      products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'Choose a product...');
+  }
+
+  async function load() {
+    Layout.clearMessage();
+    const status = document.getElementById('f-status').value;
+    const severity = document.getElementById('f-severity').value;
+    const productId = document.getElementById('f-product').value;
+    const unassigned = document.getElementById('f-unassigned').checked;
+
+    const query = new URLSearchParams();
+    if (unassigned) query.set('unassigned', 'true');
+    else {
+      if (status) query.set('status', status);
+      if (severity) query.set('severity', severity);
+      if (productId) query.set('productId', productId);
+    }
+
+    try {
+      const defects = await API.get('/api/defects' + (query.toString() ? '?' + query : ''));
+      table.setRows(defects.map(row));
+    } catch (error) {
+      Layout.showError(error);
+    }
+  }
+
+  function row(d) {
+    const open = d.currentStatus === 'OPEN';
+    const actions =
+      '<div class="btn-group btn-group-sm">' +
+      '<a class="btn btn-outline-secondary" href="defect-detail.html?id=' + d.defectId + '">Open</a>' +
+      (canRegister && open ? '<button class="btn btn-outline-secondary" data-edit="' + d.defectId + '">Edit</button>' : '') +
+      (canDelete && open ? '<button class="btn btn-outline-danger" data-delete="' + d.defectId + '">Delete</button>' : '') +
+      '</div>';
+
+    return '<tr>' +
+      '<td><a class="fw-semibold" href="defect-detail.html?id=' + d.defectId + '">' + Layout.esc(d.defectRef) + '</a></td>' +
+      '<td>' + Layout.esc(d.productCode) + ' <span class="text-secondary small d-none d-xl-inline">' + Layout.esc(d.productName) + '</span></td>' +
+      '<td>' + Layout.esc(d.batchNumber || '—') + '</td>' +
+      '<td>' + Layout.esc(d.defectCategory.replaceAll('_', ' ')) + '</td>' +
+      '<td>' + Layout.severityBadge(d.severity) + '</td>' +
+      '<td class="text-end">' + d.unitsAffected + '</td>' +
+      '<td>' + Layout.statusBadge(d.currentStatus) + '</td>' +
+      '<td class="text-end">' + d.ageInDays + '</td>' +
+      '<td class="text-end">' + actions + '</td>' +
+      '</tr>';
+  }
+
+  /* ---------- row actions (one listener, not one per button) ------------ */
+  document.getElementById('rows').addEventListener('click', async function (event) {
+    const editButton = event.target.closest('[data-edit]');
+    const deleteButton = event.target.closest('[data-delete]');
+
+    if (editButton) { openEdit(Number(editButton.dataset.edit), editButton); }
+    if (deleteButton) { await remove(Number(deleteButton.dataset.delete)); }
+  });
+
+  async function remove(id) {
+    if (!window.confirm('Delete this defect? Only a defect that is still OPEN can be deleted.')) return;
+    try {
+      await API.del('/api/defects/' + id);
+      Layout.showMessage('Defect deleted.', 'success');
+      await load();
+    } catch (error) {
+      Layout.showError(error);            // FR-06.14 explains itself in the message
+    }
+  }
+
+  /* ---------- the form -------------------------------------------------- */
+  document.getElementById('btn-new').addEventListener('click', () => openCreate());
+  document.getElementById('d-product').addEventListener('change', async () => {
+    await refreshBatchAndInspectionOptions(document.getElementById('d-product').value);
+  });
+
+  async function refreshBatchAndInspectionOptions(productId, keep) {
+    const batchSelect = document.getElementById('d-batch');
+    const inspectionSelect = document.getElementById('d-inspection');
+    Layout.fillSelect(batchSelect, [], '', 'No batch');
+    Layout.fillSelect(inspectionSelect, [], '', 'Not recorded against an inspection');
+    if (!productId) return;
+
+    const batches = await API.get('/api/batches?productId=' + productId);
+    Layout.fillSelect(batchSelect, batches.map(b => ({ value: b.batchId, label: b.batchNumber + ' (' + b.productionStatus.replaceAll('_', ' ') + ')' })),
+      keep && keep.batchId, 'No batch');
+
+    const inspections = await API.get('/api/inspections?productId=' + productId);
+    Layout.fillSelect(inspectionSelect, inspections.map(i => ({
+      value: i.inspectionId,
+      label: Layout.dateTime(i.inspectionDate) + ' · ' + i.inspectionType.replaceAll('_', ' ') + ' · ' + i.result
+    })), keep && keep.inspectionId, 'Not recorded against an inspection');
+  }
+
+  function openCreate() {
+    editingId = null;
+    document.getElementById('defect-modal-title').textContent = 'Register a defect';
+    document.getElementById('btn-save').textContent = 'Save defect';
+    form.reset();
+    document.getElementById('form-message').innerHTML = '';
+    refreshBatchAndInspectionOptions(document.getElementById('d-product').value);
+    modal.show();
+  }
+
+  function openEdit(id) {
+    API.get('/api/defects/' + id).then(detail => {
+      const d = detail.defect;
+      editingId = id;
+      document.getElementById('defect-modal-title').textContent = 'Edit ' + d.defectRef;
+      document.getElementById('btn-save').textContent = 'Save changes';
+      document.getElementById('form-message').innerHTML = '';
+      document.getElementById('d-product').value = d.productId;
+      document.getElementById('d-category').value = d.defectCategory;
+      document.getElementById('d-description').value = d.description;
+      document.getElementById('d-severity').value = d.severity;
+      document.getElementById('d-units').value = d.unitsAffected;
+      refreshBatchAndInspectionOptions(d.productId, { batchId: d.batchId, inspectionId: d.inspectionId });
+      modal.show();
+    }).catch(Layout.showError);
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    const body = {
+      productId: Number(document.getElementById('d-product').value),
+      batchId: document.getElementById('d-batch').value ? Number(document.getElementById('d-batch').value) : null,
+      inspectionId: document.getElementById('d-inspection').value ? Number(document.getElementById('d-inspection').value) : null,
+      defectCategory: document.getElementById('d-category').value,
+      description: document.getElementById('d-description').value.trim(),
+      severity: document.getElementById('d-severity').value,
+      unitsAffected: Number(document.getElementById('d-units').value)
+    };
+
+    try {
+      if (editingId === null) await API.post('/api/defects', body);
+      else await API.put('/api/defects/' + editingId, body);
+
+      modal.hide();
+      Layout.showMessage(editingId === null ? 'Defect registered.' : 'Defect updated.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">' + Layout.esc(error.message) +
+        (error.details && error.details.length ? '<ul class="mb-0 mt-1">' +
+          error.details.map(x => '<li>' + Layout.esc(x) + '</li>').join('') + '</ul>' : '') + '</div>';
+    }
+  });
+
+  /* ---------- arriving from the inspections screen ---------------------- */
+  /* inspections.html links a FAIL row here as
+     defects.html?new=1&productId=..&batchId=..&inspectionId=..
+     so the inspector does not have to type what the system already knows.
+
+     The order of these three steps is the whole trick, and it was wrong until
+     Phase 11 (defect D-01):
+       1. openCreate() resets the form, so it has to run first;
+       2. the product goes into its select, because the batch and inspection
+          lists are loaded for that product;
+       3. only then are the two ids applied - they exist as options only once
+          those lists are filled.
+     A select set to a value it does not offer yet is silently ignored by the
+     browser, which is what made this look like a feature that was never built. */
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('new') === '1' && canRegister) {
+    openCreate();
+    const productId = params.get('productId');
+    if (productId) document.getElementById('d-product').value = productId;
+    await refreshBatchAndInspectionOptions(productId, {
+      batchId: params.get('batchId'),
+      inspectionId: params.get('inspectionId')
+    });
+  }
+
+})();
+</script>
+</body>
+</html>

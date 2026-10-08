@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; }
+    .login-card { max-width: 430px; width: 100%; }
+  </style>
+</head>
+<body class="bg-dark">
+
+<div class="container py-5">
+  <div class="login-card mx-auto">
+
+    <div class="text-center text-white mb-4">
+      <h1 class="h3 mb-1">Manufacturing QMS</h1>
+      <p class="mb-0 text-white-50">Quality management and defect tracking</p>
+    </div>
+
+    <div class="card shadow">
+      <div class="card-body p-4">
+
+        <h2 class="h5 mb-3">Log in</h2>
+
+        <!-- Every message on this screen goes here: a failed login, a
+             deactivated account, or the note after a logout. -->
+        <div id="message"></div>
+
+        <form id="login-form" novalidate>
+          <div class="mb-3">
+            <label class="form-label" for="username">Username</label>
+            <input class="form-control" id="username" name="username" autocomplete="username" autofocus required>
+            <div class="invalid-feedback">Enter your username.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-control" type="password" id="password" name="password"
+                   autocomplete="current-password" required>
+            <div class="invalid-feedback">Enter your password.</div>
+          </div>
+          <button class="btn btn-primary w-100" id="btn-login" type="submit">Log in</button>
+        </form>
+
+        <hr class="my-4">
+
+        <!-- Demo accounts, from Phase 7 §15. A real system would not print
+             these on the login screen; this project is marked as a demo. -->
+        <p class="small-caps mb-2">Demo accounts</p>
+        <div class="small text-secondary">
+          <div class="d-flex justify-content-between"><span>Administrator</span><code>admin / Admin@123</code></div>
+          <div class="d-flex justify-content-between"><span>Quality Inspector</span><code>inspector1 / Inspect@123</code></div>
+          <div class="d-flex justify-content-between"><span>Production Supervisor</span><code>supervisor1 / Supervise@123</code></div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="text-center text-white-50 small mt-3 mb-0">
+      Real-Time Smart Manufacturing Quality Management and Defect Tracking System
+    </p>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   login.html — screen 1 of 10 (FR-01).
+   If a session already exists there is nothing to do here, so the page sends
+   the user straight to the dashboard. Otherwise it posts the credentials and
+   the server starts a session; the browser then holds the JSESSIONID cookie
+   and every later request carries it automatically.
+--------------------------------------------------------------------------- */
+(async function () {
+
+  // Already signed in? Go to the dashboard.
+  try { await API.get('/api/auth/me'); window.location.replace('dashboard.html'); return; }
+  catch (ignored) { /* not signed in - show the form */ }
+
+  const form = document.getElementById('login-form');
+  const button = document.getElementById('btn-login');
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    button.disabled = true;
+    button.textContent = 'Checking...';
+    Layout.clearMessage();
+
+    try {
+      await API.post('/api/auth/login', { username: username.value.trim(), password: password.value });
+      window.location.replace('dashboard.html');
+    } catch (error) {
+      // One message for a wrong username and a wrong password alike, so the
+      // screen never reveals which part was correct (FR-01.3).
+      Layout.showError(error);
+      password.value = '';
+      password.focus();
+      button.disabled = false;
+      button.textContent = 'Log in';
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

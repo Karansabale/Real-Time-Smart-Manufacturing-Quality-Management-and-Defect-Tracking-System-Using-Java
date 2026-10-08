@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Dashboard</h1>
+      <p class="text-secondary small mb-0">Live quality position &mdash; every number is read from the database each time this page is opened.</p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm no-print" id="btn-refresh">Refresh</button>
+  </div>
+
+  <div id="message"></div>
+
+  <!-- Overdue work comes first. A corrective action that has passed its target
+       date is the one thing on this screen that somebody has to act on today. -->
+  <div id="overdue-banner"></div>
+
+  <!-- Six summary tiles (FR-09.2 … FR-09.7) -->
+  <div class="row g-3 mb-3" id="tiles"></div>
+
+  <!-- Products and batches, plus the two charts (FR-09.8, FR-09.9) -->
+  <div class="row g-3 mb-3">
+    <div class="col-lg-3">
+      <div class="row g-3">
+        <div class="col-6 col-lg-12">
+          <div class="card tile h-100"><div class="card-body">
+            <div class="tile-label">Products</div>
+            <div class="tile-number" id="stat-products">&mdash;</div>
+          </div></div>
+        </div>
+        <div class="col-6 col-lg-12">
+          <div class="card tile h-100"><div class="card-body">
+            <div class="tile-label">Production batches</div>
+            <div class="tile-number" id="stat-batches">&mdash;</div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card h-100"><div class="card-body">
+        <h2 class="h6 mb-3">Defects by severity</h2>
+        <div class="chart-box"><canvas id="chart-severity"></canvas></div>
+      </div></div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card h-100"><div class="card-body">
+        <h2 class="h6 mb-3">Defects by category</h2>
+        <div class="chart-box"><canvas id="chart-category"></canvas></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Most recently raised defects (FR-09.11) -->
+  <div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h2 class="h6 mb-0">Most recent defects</h2>
+      <a class="small" href="defects.html">View all defects</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Reference</th><th>Product</th><th>Category</th><th>Severity</th>
+            <th class="text-end">Units</th><th>Status</th><th>Age</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="recent-rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   dashboard.html — screen 2 of 10 (FR-09).
+   ONE request fills this whole screen: /api/dashboard/summary. The alternative
+   - six endpoints and six requests - would paint the page piece by piece and
+   could show numbers that disagree with each other mid-load.
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const table = Layout.table('recent-rows', 'pager-footer', 8);
+  let severityChart = null;
+  let categoryChart = null;
+
+  document.getElementById('btn-refresh').addEventListener('click', load);
+  await load();
+
+  /* ------------------------------------------------------------------ */
+  async function load() {
+    Layout.clearMessage();
+    try {
+      const summary = await API.get('/api/dashboard/summary');
+      renderTiles(summary);
+      renderOverdue(summary.overdueActions);
+      try { renderCharts(summary); }
+      catch (chartError) { console.error('Charts could not be drawn:', chartError); }
+      renderRecent(summary.recentDefects);
+      document.getElementById('stat-products').textContent = summary.activeProducts;
+      document.getElementById('stat-batches').textContent = summary.totalBatches;
+    } catch (error) {
+      Layout.showError(error);
+    }
+  }
+
+  function renderTiles(s) {
+    const tiles = [
+      { label: 'Total defects',     value: s.totalDefects,       css: 'tile-total' },
+      { label: 'Open',              value: s.openDefects,        css: 'tile-open' },
+      { label: 'Under investigation', value: s.underInvestigation, css: 'tile-under' },
+      { label: 'Corrective action', value: s.correctiveAction,   css: 'tile-corrective' },
+      { label: 'Verified',          value: s.verified,           css: 'tile-verified' },
+      { label: 'Closed',            value: s.closed,             css: 'tile-closed' }
+    ];
+    document.getElementById('tiles').innerHTML = tiles.map(t =>
+      '<div class="col-6 col-lg-2"><div class="card tile h-100 ' + t.css + '"><div class="card-body py-3">' +
+      '<div class="tile-number">' + t.value + '</div>' +
+      '<div class="tile-label">' + t.label + '</div>' +
+      '</div></div></div>').join('');
+  }
+
+  function renderOverdue(count) {
+    document.getElementById('overdue-banner').innerHTML = count > 0
+      ? '<div class="alert alert-danger d-flex justify-content-between align-items-center">' +
+        '<span><strong>' + count + ' corrective action' + (count === 1 ? '' : 's') + ' overdue.</strong> ' +
+        'The target date has passed and the work is not finished.</span>' +
+        '<a class="btn btn-sm btn-danger" href="corrective-actions.html?overdue=1">Show overdue</a></div>'
+      : '<div class="alert alert-success py-2">No corrective action is overdue.</div>';
+  }
+
+  function renderCharts(s) {
+    const severityColours = { CRITICAL: '#dc3545', HIGH: '#dc3545', MEDIUM: '#e8a33d', LOW: '#198754' };
+    const categoryPalette = ['#0d6efd', '#6f42c1', '#20c997', '#fd7e14', '#d63384', '#0dcaf0', '#6c757d'];
+
+    if (severityChart) severityChart.destroy();
+    severityChart = new Chart(document.getElementById('chart-severity'), {
+      type: 'bar',
+      data: {
+        labels: s.defectsBySeverity.map(r => r.label),
+        datasets: [{
+          label: 'Defects',
+          data: s.defectsBySeverity.map(r => r.count),
+          backgroundColor: s.defectsBySeverity.map(r => severityColours[r.label] || '#6c757d')
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+
+    if (categoryChart) categoryChart.destroy();
+    categoryChart = new Chart(document.getElementById('chart-category'), {
+      type: 'doughnut',
+      data: {
+        labels: s.defectsByCategory.map(r => r.label.replaceAll('_', ' ')),
+        datasets: [{
+          data: s.defectsByCategory.map(r => r.count),
+          backgroundColor: s.defectsByCategory.map((r, i) => categoryPalette[i % categoryPalette.length])
+        }]
+      },
+      options: { plugins: { legend: { position: 'right' } } }
+    });
+  }
+
+  function renderRecent(defects) {
+    table.setRows(defects.map(d =>
+      '<tr>' +
+      '<td><a href="defect-detail.html?id=' + d.defectId + '" class="fw-semibold">' + Layout.esc(d.defectRef) + '</a></td>' +
+      '<td>' + Layout.esc(d.productCode) + ' <span class="text-secondary small">' + Layout.esc(d.productName) + '</span></td>' +
+      '<td>' + Layout.esc(d.defectCategory.replaceAll('_', ' ')) + '</td>' +
+      '<td>' + Layout.severityBadge(d.severity) + '</td>' +
+      '<td class="text-end">' + d.unitsAffected + '</td>' +
+      '<td>' + Layout.statusBadge(d.currentStatus) + '</td>' +
+      '<td>' + d.ageInDays + ' day' + (d.ageInDays === 1 ? '' : 's') + '</td>' +
+      '<td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="defect-detail.html?id=' + d.defectId + '">Open</a></td>' +
+      '</tr>'));
+  }
+
+})();
+</script>
+</body>
+</html>

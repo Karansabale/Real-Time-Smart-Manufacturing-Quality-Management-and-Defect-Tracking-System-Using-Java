@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Corrective Actions · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Corrective Actions</h1>
+      <p class="text-secondary small mb-0">The work that stops a defect happening again &mdash; and the check that proves it worked.</p>
+    </div>
+    <button class="btn btn-primary d-none" id="btn-new" data-role="SUPERVISOR">+ Assign Action</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small mb-1" for="f-person">Responsible person</label>
+          <select class="form-select form-select-sm" id="f-person"></select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small mb-1" for="f-status">Progress</label>
+          <select class="form-select form-select-sm" id="f-status">
+            <option value="">All</option>
+            <option value="PENDING">Pending</option>
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="f-overdue">
+            <label class="form-check-label small" for="f-overdue">Only overdue actions</label>
+          </div>
+        </div>
+        <div class="col-lg-3 text-lg-end">
+          <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear filters</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>#</th><th>Defect</th><th>Responsible</th><th>Action</th><th>Target</th>
+              <th>Progress</th><th>Verification</th><th class="text-end">Actions</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<div class="modal fade" id="assign-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="assign-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Assign a corrective action</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="form-message"></div>
+          <div class="mb-3">
+            <label class="form-label" for="a-defect">Defect <span class="text-danger">*</span></label>
+            <select class="form-select" id="a-defect" required></select>
+            <div class="form-text">Defects that are not yet closed. Understand the defect before you assign the work.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="a-person">Responsible person <span class="text-danger">*</span></label>
+            <select class="form-select" id="a-person" required></select>
+            <div class="form-text">Only active users appear here (FR-08.3).</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="a-description">What must be done <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="a-description" rows="3" minlength="10" maxlength="500" required></textarea>
+          </div>
+          <div class="mb-1">
+            <label class="form-label" for="a-target">Target date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="a-target" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Assign</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   corrective-actions.html — screen 9 of 10 (FR-08).
+   One table for every action in the factory, with the overdue ones highlighted.
+   Two people work on the same rows and never the same step:
+     · the Production Supervisor assigns the work and reports progress
+     · the Quality Inspector verifies whether it actually worked (FR-08.9)
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const canAssign = me.role === 'SUPERVISOR';
+  const canVerify = me.role === 'INSPECTOR';
+  const table = Layout.table('rows', 'pager-footer', 8);
+  const assignModal = new bootstrap.Modal(document.getElementById('assign-modal'));
+  let actions = [];
+  let users = [];
+
+  if (canAssign) document.getElementById('btn-new').classList.remove('d-none');
+
+  // The dashboard links here with ?overdue=1 - show only the late work.
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('overdue') === '1') document.getElementById('f-overdue').checked = true;
+
+  users = (await API.get('/api/users?active=true'));
+  Layout.fillSelect(document.getElementById('f-person'),
+    users.map(u => ({ value: u.userId, label: u.fullName })), '', 'All people');
+
+  ['f-person', 'f-status', 'f-overdue'].forEach(id => document.getElementById(id).addEventListener('change', load));
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    document.getElementById('f-person').value = '';
+    document.getElementById('f-status').value = '';
+    document.getElementById('f-overdue').checked = false;
+    load();
+  });
+  document.getElementById('btn-new').addEventListener('click', openAssign);
+  document.getElementById('assign-form').addEventListener('submit', saveAssign);
+
+  await load();
+
+  async function load() {
+    Layout.clearMessage();
+    try {
+      actions = await API.get('/api/corrective-actions');
+      render();
+    } catch (error) { Layout.showError(error); }
+  }
+
+  function render() {
+    const personId = document.getElementById('f-person').value;
+    const progress = document.getElementById('f-status').value;
+    const overdueOnly = document.getElementById('f-overdue').checked;
+
+    // The person filter compares by name, because that is what the response
+    // carries; everything else is filtered here rather than in the server.
+    const personName = personId ? (users.find(u => String(u.userId) === personId) || {}).fullName : null;
+
+    const filtered = actions.filter(a =>
+      (!personName || a.responsiblePerson === personName) &&
+      (!progress || a.progressStatus === progress) &&
+      (!overdueOnly || a.overdue));
+
+    table.setRows(filtered.map(row));
+  }
+
+  function row(a) {
+    const canProgress = me.role === 'SUPERVISOR' && a.verificationStatus === 'PENDING';
+    const canVerifyRow = canVerify && a.progressStatus === 'COMPLETED' && a.verificationStatus === 'PENDING';
+
+    /* Progress and Verify open the defect screen with the matching dialogue
+       already showing. The forms live in one file only, and the click still
+       lands the user straight on the job. */
+    const buttons =
+      '<div class="btn-group btn-group-sm">' +
+      '<a class="btn btn-outline-secondary" href="defect-detail.html?id=' + a.defectId + '">Defect</a>' +
+      (canProgress ? '<a class="btn btn-outline-secondary" title="Update progress on this action" href="defect-detail.html?id=' +
+        a.defectId + '&action=' + a.actionId + '&do=progress">Progress</a>' : '') +
+      (canVerifyRow ? '<a class="btn btn-outline-primary" title="Verify whether this action worked" href="defect-detail.html?id=' +
+        a.defectId + '&action=' + a.actionId + '&do=verify">Verify</a>' : '') +
+      '</div>';
+
+    return '<tr class="' + (a.overdue ? 'overdue' : '') + '">' +
+      '<td>' + a.actionId + '</td>' +
+      '<td><a href="defect-detail.html?id=' + a.defectId + '">' + Layout.esc(a.defectRef) + '</a></td>' +
+      '<td>' + Layout.esc(a.responsiblePerson) + '</td>' +
+      '<td>' + Layout.esc(a.actionDescription) +
+        (a.verificationRemark ? '<div class="text-secondary small fst-italic">Verified: ' + Layout.esc(a.verificationRemark) + '</div>' : '') +
+      '</td>' +
+      '<td>' + Layout.date(a.targetDate) +
+        (a.overdue ? '<div class="text-overdue small">' + a.daysOverdue + ' day' + (a.daysOverdue === 1 ? '' : 's') + ' overdue</div>' : '') +
+      '</td>' +
+      '<td><span class="badge prog-' + a.progressStatus + '">' + a.progressStatus.replaceAll('_', ' ') + '</span></td>' +
+      '<td><span class="badge ver-' + a.verificationStatus + '">' + a.verificationStatus.replaceAll('_', ' ') + '</span></td>' +
+      '<td class="text-end">' + buttons + '</td></tr>';
+  }
+
+  async function openAssign() {
+    document.getElementById('assign-form').reset();
+    document.getElementById('form-message').innerHTML = '';
+    document.getElementById('a-target').min = new Date().toISOString().slice(0, 10);
+
+    const defects = await API.get('/api/defects');
+    Layout.fillSelect(document.getElementById('a-defect'),
+      defects.filter(d => d.currentStatus !== 'CLOSED')
+        .map(d => ({ value: d.defectId, label: d.defectRef + ' · ' + d.productCode + ' · ' + d.currentStatus.replaceAll('_', ' ') })),
+      '', 'Choose a defect...');
+    Layout.fillSelect(document.getElementById('a-person'),
+      users.map(u => ({ value: u.userId, label: u.fullName + ' (' + Layout.roleLabel(u.role) + ')' })), '', 'Choose a person...');
+    assignModal.show();
+  }
+
+  async function saveAssign(event) {
+    event.preventDefault();
+    const form = document.getElementById('assign-form');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    try {
+      await API.post('/api/defects/' + document.getElementById('a-defect').value + '/corrective-actions', {
+        responsiblePersonId: Number(document.getElementById('a-person').value),
+        actionDescription: document.getElementById('a-description').value.trim(),
+        targetDate: document.getElementById('a-target').value
+      });
+      assignModal.hide();
+      Layout.showMessage('Corrective action assigned.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">' + Layout.esc(error.message) + '</div>';
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

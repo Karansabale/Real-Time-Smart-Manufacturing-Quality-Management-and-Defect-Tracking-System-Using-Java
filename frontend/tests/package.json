@@ -1,0 +1,16 @@
+{
+  "name": "manufacturing-qms-frontend-checks",
+  "private": true,
+  "type": "module",
+  "description": "Optional page checks for the Phase 9 screens. Not needed to run the application.",
+  "scripts": {
+    "verify": "bash verify-pages.sh"
+  },
+  "devDependencies": {
+    "canvas": "^3.0.0",
+    "jsdom": "^26.0.0"
+  },
+  "dependencies": {
+    "puppeteer": "^24.43.1"
+  }
+}

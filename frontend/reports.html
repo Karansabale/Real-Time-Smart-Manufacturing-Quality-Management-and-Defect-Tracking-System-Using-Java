@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Reports</h1>
+      <p class="text-secondary small mb-0">Four views of the quality record, each with filters and a print layout.</p>
+    </div>
+    <button class="btn btn-outline-secondary no-print" id="btn-print">Print</button>
+  </div>
+
+  <div id="message"></div>
+
+  <!-- Report selector -->
+  <div class="card mb-3 no-print">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label small mb-1" for="r-type">Report</label>
+          <select class="form-select form-select-sm" id="r-type">
+            <option value="defects">Defect register</option>
+            <option value="rejection-rate">Rejection rate by product</option>
+            <option value="production-quality">Quality by production line</option>
+            <option value="overdue-actions">Overdue corrective actions</option>
+          </select>
+        </div>
+
+        <!-- Filters for the defect register -->
+        <div class="col-md-6 col-lg-2 filter" data-for="defects">
+          <label class="form-label small mb-1" for="r-status">Status</label>
+          <select class="form-select form-select-sm" id="r-status"></select>
+        </div>
+        <div class="col-md-6 col-lg-2 filter" data-for="defects">
+          <label class="form-label small mb-1" for="r-severity">Severity</label>
+          <select class="form-select form-select-sm" id="r-severity"></select>
+        </div>
+        <div class="col-md-6 col-lg-3 filter" data-for="defects">
+          <label class="form-label small mb-1" for="r-product">Product</label>
+          <select class="form-select form-select-sm" id="r-product"></select>
+        </div>
+
+        <!-- Filters for the rejection-rate report -->
+        <div class="col-md-6 col-lg-2 filter" data-for="rejection-rate">
+          <label class="form-label small mb-1" for="r-from">From</label>
+          <input type="date" class="form-control form-control-sm" id="r-from">
+        </div>
+        <div class="col-md-6 col-lg-2 filter" data-for="rejection-rate">
+          <label class="form-label small mb-1" for="r-to">To</label>
+          <input type="date" class="form-control form-control-sm" id="r-to">
+        </div>
+
+        <div class="col-lg-2">
+          <button class="btn btn-sm btn-primary" id="btn-generate">Generate</button>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-reset">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The report itself -->
+  <div class="card">
+    <div class="card-body">
+
+      <!-- Print header: hidden on screen, shown on paper (FR-10.9) -->
+      <div id="print-header">
+        <h1 id="print-title">Report</h1>
+        <div class="meta" id="print-criteria"></div>
+        <div class="meta" id="print-footer-line"></div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0" id="report-title">Defect register</h2>
+        <span class="text-secondary small" id="report-meta"></span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle mb-0" id="report-table">
+          <thead class="table-light"><tr id="report-head"></tr></thead>
+          <tbody id="report-rows"></tbody>
+        </table>
+      </div>
+
+      <div id="report-empty"></div>
+    </div>
+  </div>
+
+</main>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   reports.html — screen 10 of 10 (FR-10).
+
+   All four reports come back from the server in the same shape - a list of
+   column headings and a list of rows - so this page needs ONE table renderer
+   rather than four. Two details from the design live here:
+
+     FR-10.11  a report that matches nothing shows the server's explanation
+               ("No inspections were recorded in the selected period...")
+               instead of an empty table
+
+     FR-10.9   the print layout hides the navbar, filters and buttons, and
+               prints a header with the report name, the criteria used, the
+               time and who generated it
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const TITLES = {
+    'defects': 'Defect register',
+    'rejection-rate': 'Rejection rate by product',
+    'production-quality': 'Quality by production line',
+    'overdue-actions': 'Overdue corrective actions'
+  };
+
+  const products = await API.get('/api/products');
+  Layout.fillSelect(document.getElementById('r-status'),
+    ['OPEN', 'UNDER_INVESTIGATION', 'CORRECTIVE_ACTION', 'VERIFIED', 'CLOSED']
+      .map(s => ({ value: s, label: s.replaceAll('_', ' ') })), '', 'All statuses');
+  Layout.fillSelect(document.getElementById('r-severity'),
+    ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(s => ({ value: s, label: s })), '', 'All severities');
+  Layout.fillSelect(document.getElementById('r-product'),
+    products.map(p => ({ value: p.productId, label: p.productCode + ' - ' + p.productName })), '', 'All products');
+
+  document.getElementById('r-type').addEventListener('change', () => { showFilters(); generate(); });
+  document.getElementById('btn-generate').addEventListener('click', generate);
+  document.getElementById('btn-print').addEventListener('click', () => window.print());
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    document.getElementById('r-status').value = '';
+    document.getElementById('r-severity').value = '';
+    document.getElementById('r-product').value = '';
+    document.getElementById('r-from').value = '';
+    document.getElementById('r-to').value = '';
+    generate();
+  });
+
+  showFilters();
+  await generate();
+
+  function showFilters() {
+    const type = document.getElementById('r-type').value;
+    document.querySelectorAll('.filter').forEach(box =>
+      box.classList.toggle('d-none', box.dataset.for !== type));
+  }
+
+  function currentQuery() {
+    const type = document.getElementById('r-type').value;
+    const query = new URLSearchParams();
+    if (type === 'defects') {
+      if (document.getElementById('r-status').value) query.set('status', document.getElementById('r-status').value);
+      if (document.getElementById('r-severity').value) query.set('severity', document.getElementById('r-severity').value);
+      if (document.getElementById('r-product').value) query.set('productId', document.getElementById('r-product').value);
+    }
+    if (type === 'rejection-rate') {
+      if (document.getElementById('r-from').value) query.set('from', document.getElementById('r-from').value);
+      if (document.getElementById('r-to').value) query.set('to', document.getElementById('r-to').value);
+    }
+    return query;
+  }
+
+  function describeCriteria() {
+    const type = document.getElementById('r-type').value;
+    const bits = [];
+    if (type === 'defects') {
+      bits.push('Status: ' + (document.getElementById('r-status').value || 'all'));
+      bits.push('Severity: ' + (document.getElementById('r-severity').value || 'all'));
+      const product = document.getElementById('r-product');
+      bits.push('Product: ' + (product.value ? product.options[product.selectedIndex].text : 'all'));
+    }
+    if (type === 'rejection-rate') {
+      bits.push('From: ' + (document.getElementById('r-from').value || 'any date'));
+      bits.push('To: ' + (document.getElementById('r-to').value || 'today'));
+    }
+    return bits.join('   |   ');
+  }
+
+  async function generate() {
+    Layout.clearMessage();
+    const type = document.getElementById('r-type').value;
+    const query = currentQuery();
+
+    try {
+      const report = await API.get('/api/reports/' + type + (query.toString() ? '?' + query : ''));
+      renderReport(report, type);
+    } catch (error) {
+      Layout.showError(error);
+    }
+  }
+
+  function renderReport(report, type) {
+    const title = TITLES[type] || report.reportType;
+    document.getElementById('report-title').textContent = title;
+
+    // Print header: what was asked for, when, and by whom (FR-10.9)
+    document.getElementById('print-title').textContent = 'Manufacturing QMS — ' + title;
+    document.getElementById('print-criteria').textContent =
+      report.rows.length + ' record' + (report.rows.length === 1 ? '' : 's') +
+      (describeCriteria() ? '   |   ' + describeCriteria() : '');
+    document.getElementById('print-footer-line').textContent =
+      'Generated ' + report.generatedAt + ' by ' + me.fullName + ' (' + Layout.roleLabel(me.role) + ')';
+
+    document.getElementById('report-meta').textContent = 'Generated ' + report.generatedAt;
+
+    document.getElementById('report-head').innerHTML =
+      report.columns.map(c => '<th>' + Layout.esc(c) + '</th>').join('');
+
+    document.getElementById('report-rows').innerHTML =
+      report.rows.map(row => '<tr>' + row.cells.map(cell => '<td>' + Layout.esc(cell) + '</td>').join('') + '</tr>').join('');
+
+    // FR-10.11: a report that found nothing says so, and the table is hidden
+    // so nobody mistakes an empty grid for a broken screen.
+    const empty = document.getElementById('report-empty');
+    const table = document.getElementById('report-table');
+    if (report.rows.length === 0) {
+      table.classList.add('d-none');
+      empty.innerHTML = '<div class="empty-state"><div class="empty-title">' +
+        Layout.esc(report.message || 'No records found for the selected criteria.') + '</div></div>';
+    } else {
+      table.classList.remove('d-none');
+      empty.innerHTML = '';
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

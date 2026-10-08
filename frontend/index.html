@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Manufacturing QMS</title>
+  <!-- index.html is a signpost, not a screen: it sends the browser to the
+       dashboard if a session exists, and to the login page if it does not. -->
+  <script src="js/api.js"></script>
+</head>
+<body>
+<script>
+  (async function () {
+    try   { await API.get('/api/auth/me'); window.location.replace('dashboard.html'); }
+    catch (e) { window.location.replace('login.html'); }
+  })();
+</script>
+</body>
+</html>

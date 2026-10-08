@@ -1,0 +1,76 @@
+--- index.html ---
+  PASS  no javascript errors
+--- login.html ---
+  PASS  #login-form == 1
+  PASS  page says "Demo accounts"
+  PASS  no javascript errors
+Unable to revert mtime: /usr/local/share/fonts
+--- dashboard.html ---
+  PASS  login as inspector1
+  PASS  #recent-rows tr == 5
+  PASS  #tiles .tile >= 6
+  PASS  page says "2 corrective actions overdue"
+  PASS  no javascript errors
+--- defects.html ---
+  PASS  login as inspector1
+  PASS  #rows tr == 10
+  PASS  #f-status option == 6
+  PASS  page says "+ New Defect"
+  PASS  no javascript errors
+--- defect-detail.html?id=3 ---
+  PASS  login as inspector1
+  PASS  #timeline li >= 4
+  PASS  page says "DEF-2026-0003"
+  PASS  page says "Move to CLOSED"
+  PASS  no javascript errors
+--- defect-detail.html?id=9 ---
+  PASS  login as supervisor1
+  PASS  #timeline li >= 2
+  PASS  page says "DEF-2026-0009"
+  PASS  page says "Move to CORRECTIVE ACTION"
+  PASS  no javascript errors
+--- users.html ---
+  PASS  login as admin
+  PASS  #rows tr == 6
+  PASS  #rows [data-deactivate] >= 1
+  PASS  no javascript errors
+--- users.html ---
+  PASS  login as inspector1
+  PASS  page says "Administrators only"
+  PASS  no javascript errors
+--- products.html ---
+  PASS  login as admin
+  PASS  #rows tr == 6
+  PASS  #rows [data-edit] == 6
+  PASS  no javascript errors
+--- products.html ---
+  PASS  login as inspector1
+  PASS  #rows tr == 6
+  PASS  no javascript errors
+--- batches.html ---
+  PASS  login as supervisor1
+  PASS  #rows tr == 10
+  PASS  #rows [data-status] == 10
+  PASS  no javascript errors
+--- inspections.html ---
+  PASS  login as inspector1
+  PASS  #rows tr == 12
+  PASS  #rows a[href*='defects.html?new=1'] >= 1
+  PASS  no javascript errors
+--- corrective-actions.html ---
+  PASS  login as supervisor1
+  PASS  #rows tr == 8
+  PASS  #rows tr.overdue == 2
+  PASS  no javascript errors
+--- corrective-actions.html?overdue=1 ---
+  PASS  login as supervisor1
+  PASS  #rows tr == 2
+  PASS  no javascript errors
+--- reports.html ---
+  PASS  login as admin
+  PASS  #report-rows tr == 10
+  PASS  #report-head th == 8
+  PASS  no javascript errors
+
+==================================================
+  Phase 9 page checks:  PASSED 57   FAILED 0

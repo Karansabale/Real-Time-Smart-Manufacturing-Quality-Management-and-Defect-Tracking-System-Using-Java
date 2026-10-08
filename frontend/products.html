@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Products · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Products</h1>
+      <p class="text-secondary small mb-0">The parts this factory makes. Inspections, batches and defects all hang off these records.</p>
+    </div>
+    <button class="btn btn-primary d-none" id="btn-new" data-role="ADMIN">+ Add Product</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label small mb-1" for="f-search">Search</label>
+          <input class="form-control form-control-sm" id="f-search" placeholder="Product code or name...">
+        </div>
+        <div class="col-md-6 col-lg-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Code</th><th>Product name</th><th>Category</th><th>Specification</th>
+              <th>Added by</th><th class="text-end">Actions</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white" id="pager-footer"></div>
+  </div>
+
+</main>
+
+<div class="modal fade" id="product-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="product-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="product-modal-title">Add a product</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="form-message"></div>
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label" for="p-code">Product code <span class="text-danger">*</span></label>
+              <input class="form-control" id="p-code" minlength="2" maxlength="20" required placeholder="e.g. P-107">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="p-name">Product name <span class="text-danger">*</span></label>
+              <input class="form-control" id="p-name" maxlength="100" required>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="p-category">Category <span class="text-danger">*</span></label>
+              <input class="form-control" id="p-category" maxlength="50" required placeholder="e.g. Machined component">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="p-specification">Specification</label>
+              <textarea class="form-control" id="p-specification" rows="2" maxlength="255"
+                        placeholder="Material, size, tolerance..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save">Save product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   products.html — screen 4 of 10 (FR-03).
+   Everyone may look; only an Administrator may add, change or remove (Phase 4
+   §6.2). A product that has been used by a batch cannot be deleted, and the
+   refusal explains why (FR-03.8).
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const isAdmin = me.role === 'ADMIN';
+  const table = Layout.table('rows', 'pager-footer', 6);
+  const modal = new bootstrap.Modal(document.getElementById('product-modal'));
+  const form = document.getElementById('product-form');
+  let editing = null;
+  let searchTimer = null;
+
+  if (isAdmin) document.getElementById('btn-new').classList.remove('d-none');
+
+  document.getElementById('btn-new').addEventListener('click', openCreate);
+  document.getElementById('rows').addEventListener('click', onRowClick);
+  form.addEventListener('submit', save);
+  document.getElementById('f-search').addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(load, 250);           // wait for typing to pause
+  });
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    document.getElementById('f-search').value = '';
+    load();
+  });
+
+  await load();
+
+  async function load() {
+    Layout.clearMessage();
+    const q = document.getElementById('f-search').value.trim();
+    try {
+      table.setRows((await API.get('/api/products' + (q ? '?q=' + encodeURIComponent(q) : ''))).map(row));
+    } catch (error) { Layout.showError(error); }
+  }
+
+  function row(p) {
+    return '<tr>' +
+      '<td class="fw-semibold">' + Layout.esc(p.productCode) + '</td>' +
+      '<td>' + Layout.esc(p.productName) + '</td>' +
+      '<td>' + Layout.esc(p.category) + '</td>' +
+      '<td class="text-secondary small">' + Layout.esc(p.specification || '—') + '</td>' +
+      '<td>' + Layout.esc(p.createdBy) + '</td>' +
+      '<td class="text-end">' + (isAdmin
+        ? '<div class="btn-group btn-group-sm">' +
+          '<button class="btn btn-outline-secondary" data-edit="' + p.productId + '">Edit</button>' +
+          '<button class="btn btn-outline-danger" data-delete="' + p.productId + '">Delete</button></div>'
+        : '<span class="text-secondary small">—</span>') + '</td></tr>';
+  }
+
+  async function onRowClick(event) {
+    const edit = event.target.closest('[data-edit]');
+    const del = event.target.closest('[data-delete]');
+    if (edit) openEdit(Number(edit.dataset.edit));
+    if (del) remove(Number(del.dataset.delete));
+  }
+
+  async function remove(id) {
+    if (!window.confirm('Delete this product? This cannot be undone.')) return;
+    try {
+      await API.del('/api/products/' + id);
+      Layout.showMessage('Product deleted.', 'success');
+      await load();
+    } catch (error) {
+      // The server refuses when production batches refer to the product and
+      // says how many - that message is shown as-is (FR-03.8).
+      Layout.showError(error);
+    }
+  }
+
+  function openCreate() {
+    editing = null;
+    document.getElementById('product-modal-title').textContent = 'Add a product';
+    document.getElementById('btn-save').textContent = 'Save product';
+    document.getElementById('form-message').innerHTML = '';
+    form.reset();
+    modal.show();
+  }
+
+  async function openEdit(id) {
+    const products = await API.get('/api/products');
+    const p = products.find(x => x.productId === id);
+    if (!p) return;
+    editing = p;
+    document.getElementById('product-modal-title').textContent = 'Edit ' + p.productCode;
+    document.getElementById('btn-save').textContent = 'Save changes';
+    document.getElementById('form-message').innerHTML = '';
+    document.getElementById('p-code').value = p.productCode;
+    document.getElementById('p-name').value = p.productName;
+    document.getElementById('p-category').value = p.category;
+    document.getElementById('p-specification').value = p.specification || '';
+    modal.show();
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    const body = {
+      productCode: document.getElementById('p-code').value.trim(),
+      productName: document.getElementById('p-name').value.trim(),
+      category: document.getElementById('p-category').value.trim(),
+      specification: document.getElementById('p-specification').value.trim() || null
+    };
+
+    try {
+      if (editing === null) await API.post('/api/products', body);
+      else await API.put('/api/products/' + editing.productId, body);
+      modal.hide();
+      Layout.showMessage(editing === null ? 'Product added.' : 'Product updated.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('form-message').innerHTML =
+        '<div class="alert alert-danger mb-3">' + Layout.esc(error.message) +
+        (error.details && error.details.length ? '<ul class="mb-0 mt-1">' +
+          error.details.map(x => '<li>' + Layout.esc(x) + '</li>').join('') + '</ul>' : '') + '</div>';
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

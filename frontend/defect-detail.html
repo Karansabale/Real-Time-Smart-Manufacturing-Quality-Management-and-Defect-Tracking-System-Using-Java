@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Defect · Manufacturing QMS</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="app-navbar"></header>
+
+<main class="container-fluid px-4 py-4" id="page" style="display:none">
+
+  <div id="message"></div>
+
+  <!-- ---------------------------- defect header ------------------------- -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h1 class="h4 mb-1" id="h-ref">&mdash;</h1>
+          <div class="text-secondary small" id="h-product"></div>
+        </div>
+        <div class="text-end">
+          <div class="mt-2 d-flex gap-2 no-print">
+            <a class="btn btn-sm btn-outline-secondary" href="defects.html">Back to list</a>
+            <button class="btn btn-sm btn-outline-danger d-none" id="btn-delete">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="row g-3 small" id="h-grid"></div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+
+      <!-- ------------------------ status change panel -------------------- -->
+      <div class="card mb-3">
+        <div class="card-header bg-white"><h2 class="h6 mb-0">Move this defect on</h2></div>
+        <div class="card-body">
+          <div id="move-message"></div>
+          <div id="move-hint" class="text-secondary small mb-3"></div>
+          <div class="mb-3">
+            <label class="form-label small mb-1" for="move-remark">Remark</label>
+            <textarea class="form-control form-control-sm" id="move-remark" rows="2" maxlength="500"
+                      placeholder="Required when moving a defect backwards (FR-07.6)"></textarea>
+          </div>
+          <div id="move-buttons" class="d-flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- --------------------- corrective action panel ------------------- -->
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h2 class="h6 mb-0">Corrective actions</h2>
+          <button class="btn btn-sm btn-primary d-none" id="btn-assign" data-role="SUPERVISOR">+ Assign action</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th><th>Responsible</th><th>Action</th><th>Target</th>
+                <th>Progress</th><th>Verification</th><th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="action-rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ------------------------------ timeline --------------------------- -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header bg-white"><h2 class="h6 mb-0">Status timeline</h2></div>
+        <div class="card-body">
+          <ul class="timeline" id="timeline"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ======================= assign a corrective action ===================== -->
+<div class="modal fade" id="assign-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="assign-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Assign a corrective action</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="assign-message"></div>
+          <div class="mb-3">
+            <label class="form-label" for="a-person">Responsible person <span class="text-danger">*</span></label>
+            <select class="form-select" id="a-person" required></select>
+            <div class="form-text">Only active users are listed (FR-08.3).</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="a-description">What must be done <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="a-description" rows="3" minlength="10" maxlength="500" required
+                      placeholder="The action that will stop this defect happening again (at least 10 characters)"></textarea>
+          </div>
+          <div class="mb-1">
+            <label class="form-label" for="a-target">Target date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="a-target" required>
+            <div class="form-text">Today or later (FR-08.4).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Assign</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ========================== update progress ============================ -->
+<div class="modal fade" id="progress-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="progress-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Update progress</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="progress-message"></div>
+          <div class="mb-3">
+            <label class="form-label" for="p-status">Progress <span class="text-danger">*</span></label>
+            <select class="form-select" id="p-status" required>
+              <option value="PENDING">Pending &mdash; not started</option>
+              <option value="IN_PROGRESS">In progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+            <div class="form-text">Choosing Completed records today's date as the completion date (FR-08.7).</div>
+          </div>
+          <div class="mb-1">
+            <label class="form-label" for="p-remark">Remark</label>
+            <textarea class="form-control" id="p-remark" rows="2" maxlength="500"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save progress</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== verify the action's effect ====================== -->
+<div class="modal fade" id="verify-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="verify-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Verify effectiveness</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="verify-message"></div>
+          <p class="small text-secondary">
+            Did the action actually stop the problem? This is the check that closes the loop,
+            and it is done by an inspector, not by the person who did the work (FR-08.9).
+          </p>
+          <div class="mb-3">
+            <label class="form-label" for="v-status">Outcome <span class="text-danger">*</span></label>
+            <select class="form-select" id="v-status" required>
+              <option value="EFFECTIVE">Effective &mdash; the problem is fixed</option>
+              <option value="NOT_EFFECTIVE">Not effective &mdash; further action is needed</option>
+            </select>
+          </div>
+          <div class="mb-1">
+            <label class="form-label" for="v-remark">Evidence / remark <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="v-remark" rows="3" maxlength="500" required
+                      placeholder="What did you check, and what did you find?"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Record verification</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   defect-detail.html — screen 8 of 10 (FR-06.12, FR-07, FR-08).
+
+   This is where the whole project meets. Three things happen on this screen:
+     1. the status timeline shows everything that has happened so far
+     2. the status panel offers ONLY the moves this user is allowed to make,
+        because the server computes that list from the same rule it enforces
+     3. corrective actions are assigned, followed up and verified
+--------------------------------------------------------------------------- */
+(async function () {
+
+  const me = await Layout.boot();
+  if (!me) return;
+
+  const LIFE = ['OPEN', 'UNDER_INVESTIGATION', 'CORRECTIVE_ACTION', 'VERIFIED', 'CLOSED'];
+  const NEXT = {
+    OPEN: 'UNDER_INVESTIGATION', UNDER_INVESTIGATION: 'CORRECTIVE_ACTION',
+    CORRECTIVE_ACTION: 'VERIFIED', VERIFIED: 'CLOSED', CLOSED: '—'
+  };
+  const NEXT_STEP_OWNER = {
+    OPEN: 'a Production Supervisor',
+    UNDER_INVESTIGATION: 'a Production Supervisor',
+    CORRECTIVE_ACTION: 'a Quality Inspector',
+    VERIFIED: 'a Quality Inspector or an Administrator'
+  };
+
+  const defectId = new URLSearchParams(window.location.search).get('id');
+  if (!defectId) { window.location.replace('defects.html'); return; }
+
+  const assignModal  = new bootstrap.Modal(document.getElementById('assign-modal'));
+  const progressModal = new bootstrap.Modal(document.getElementById('progress-modal'));
+  const verifyModal  = new bootstrap.Modal(document.getElementById('verify-modal'));
+  let detail = null;
+  let progressActionId = null;
+  let verifyActionId = null;
+
+  document.getElementById('page').style.display = '';
+
+  if (me.role === 'SUPERVISOR') document.getElementById('btn-assign').classList.remove('d-none');
+  document.getElementById('btn-assign').addEventListener('click', openAssign);
+  document.getElementById('btn-delete').addEventListener('click', removeDefect);
+
+  await load();
+
+  /* Arriving from corrective-actions.html as
+     defect-detail.html?id=..&action=<id>&do=progress (or verify) opens the
+     matching dialogue straight away, so a supervisor can work down the overdue
+     list without hunting for the row. The dialogues themselves exist in this
+     file only - one definition, used from two screens. */
+  const params = new URLSearchParams(window.location.search);
+  const targetAction = Number(params.get('action'));
+  const what = params.get('do');
+
+  /* =============================== loading ============================== */
+  async function load() {
+    Layout.clearMessage();
+    try {
+      detail = await API.get('/api/defects/' + defectId);
+      renderHeader(detail.defect);
+      renderMovements(detail);
+      renderActions(detail);
+      renderTimeline(detail.history);
+      if (targetAction && what === 'progress') openProgress(targetAction);
+      if (targetAction && what === 'verify') openVerify(targetAction);
+    } catch (error) {
+      Layout.showError(error);
+    }
+  }
+
+  function renderHeader(d) {
+    document.getElementById('h-ref').innerHTML = Layout.esc(d.defectRef) + ' ' + Layout.statusBadge(d.currentStatus);
+    document.getElementById('h-product').textContent =
+      d.productCode + ' - ' + d.productName + (d.batchNumber ? ' · batch ' + d.batchNumber : ' · no batch recorded');
+
+    const open = d.currentStatus === 'OPEN';
+    document.getElementById('btn-delete').classList.toggle('d-none',
+      !((me.role === 'INSPECTOR' || me.role === 'ADMIN') && open));
+
+    const items = [
+      ['Category', d.defectCategory.replaceAll('_', ' ')],
+      ['Severity', Layout.severityBadge(d.severity)],
+      ['Units affected', d.unitsAffected],
+      ['Age', d.ageInDays + ' day' + (d.ageInDays === 1 ? '' : 's')],
+      ['Reported by', Layout.esc(d.reportedBy || d.createdBy)],
+      ['Registered', Layout.dateTime(d.createdAt)],
+      ['Last updated by', Layout.esc(d.updatedBy)],
+      ['Last updated', Layout.dateTime(d.updatedAt)]
+    ];
+    document.getElementById('h-grid').innerHTML = items.map(([label, value]) =>
+      '<div class="col-6 col-md-3"><div class="small-caps">' + label + '</div><div>' + value + '</div></div>').join('');
+
+    document.getElementById('h-grid').innerHTML +=
+      '<div class="col-12"><div class="small-caps">Description</div><div>' + Layout.esc(d.description) + '</div></div>';
+  }
+
+  /* ============================ status panel ============================ */
+  function renderMovements(detail) {
+    const d = detail.defect;
+    const allowed = detail.allowedNextStatuses || [];
+    const buttons = document.getElementById('move-buttons');
+    const hint = document.getElementById('move-hint');
+    document.getElementById('move-message').innerHTML = '';
+
+    if (allowed.length === 0) {
+      buttons.innerHTML = '';
+      hint.textContent = d.currentStatus === 'CLOSED'
+        ? 'This defect is closed. A closed defect cannot be reopened.'
+        : 'No status change is available to you from ' + d.currentStatus.replaceAll('_', ' ') +
+          '. The next step (' + NEXT[d.currentStatus] + ') is taken by ' + NEXT_STEP_OWNER[d.currentStatus] + '.';
+      return;
+    }
+
+    hint.innerHTML = 'You are signed in as ' + Layout.roleLabel(me.role) + '. ' +
+      'Only the moves allowed for your role are offered here.';
+    buttons.innerHTML = allowed.map(status =>
+      '<button class="btn btn-sm ' + (LIFE.indexOf(status) < LIFE.indexOf(d.currentStatus)
+        ? 'btn-outline-danger' : 'btn-primary') + '" data-move="' + status + '">' +
+      'Move to ' + status.replaceAll('_', ' ') + '</button>').join('');
+
+    buttons.querySelectorAll('[data-move]').forEach(button =>
+      button.addEventListener('click', () => move(button.dataset.move)));
+  }
+
+  async function move(target) {
+    const remark = document.getElementById('move-remark').value.trim();
+    const backwards = LIFE.indexOf(target) < LIFE.indexOf(detail.defect.currentStatus);
+
+    if (backwards && !remark) {
+      document.getElementById('move-message').innerHTML =
+        '<div class="alert alert-warning py-2 small mb-2">A reason is required when moving a defect ' +
+        'backwards (FR-07.6). Please write why in the Remark box, then try again.</div>';
+      document.getElementById('move-remark').focus();
+      return;
+    }
+    if (!window.confirm('Move ' + detail.defect.defectRef + ' to ' + target.replaceAll('_', ' ') + '?')) return;
+
+    try {
+      await API.put('/api/defects/' + defectId + '/status', { status: target, remark: remark || null });
+      document.getElementById('move-remark').value = '';
+      Layout.showMessage('Moved to ' + target.replaceAll('_', ' ') + '.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('move-message').innerHTML =
+        '<div class="alert alert-danger py-2 small mb-2">' + Layout.esc(error.message) + '</div>';
+    }
+  }
+
+  /* ======================== corrective actions ========================== */
+  function renderActions(detail) {
+    const rows = (detail.correctiveActions || []).map(a => {
+      const canProgress = me.role === 'SUPERVISOR' && a.verificationStatus === 'PENDING';
+      const canVerify = me.role === 'INSPECTOR' && a.progressStatus === 'COMPLETED' && a.verificationStatus === 'PENDING';
+
+      const actions =
+        '<div class="btn-group btn-group-sm">' +
+        (canProgress ? '<button class="btn btn-outline-secondary" data-progress="' + a.actionId + '">Progress</button>' : '') +
+        (canVerify ? '<button class="btn btn-outline-primary" data-verify="' + a.actionId + '">Verify</button>' : '') +
+        (!canProgress && !canVerify ? '<span class="text-secondary small">—</span>' : '') +
+        '</div>';
+
+      return '<tr class="' + (a.overdue ? 'overdue' : '') + '">' +
+        '<td>' + a.actionId + '</td>' +
+        '<td>' + Layout.esc(a.responsiblePerson) + '</td>' +
+        '<td>' + Layout.esc(a.actionDescription) +
+          (a.progressRemark ? '<div class="text-secondary small">' + Layout.esc(a.progressRemark) + '</div>' : '') +
+          (a.verificationRemark ? '<div class="text-secondary small fst-italic">Verified: ' + Layout.esc(a.verificationRemark) + '</div>' : '') +
+        '</td>' +
+        '<td>' + Layout.date(a.targetDate) +
+          (a.overdue ? '<div class="text-overdue small">' + a.daysOverdue + ' day' + (a.daysOverdue === 1 ? '' : 's') + ' overdue</div>' : '') +
+        '</td>' +
+        '<td><span class="badge prog-' + a.progressStatus + '">' + a.progressStatus.replaceAll('_', ' ') + '</span>' +
+          (a.completionDate ? '<div class="text-secondary small">' + Layout.date(a.completionDate) + '</div>' : '') + '</td>' +
+        '<td><span class="badge ver-' + a.verificationStatus + '">' + a.verificationStatus.replaceAll('_', ' ') + '</span>' +
+          (a.verifiedBy ? '<div class="text-secondary small">' + Layout.esc(a.verifiedBy) + '</div>' : '') + '</td>' +
+        '<td class="text-end">' + actions + '</td>' +
+        '</tr>';
+    });
+
+    const tbody = document.getElementById('action-rows');
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">' +
+        '<div class="empty-title">No corrective action has been assigned to this defect yet.</div>' +
+        '<div>A defect cannot move to CORRECTIVE_ACTION until one exists.</div></div></td></tr>';
+    } else {
+      tbody.innerHTML = rows.join('');
+    }
+
+    tbody.querySelectorAll('[data-progress]').forEach(b =>
+      b.addEventListener('click', () => openProgress(Number(b.dataset.progress))));
+    tbody.querySelectorAll('[data-verify]').forEach(b =>
+      b.addEventListener('click', () => openVerify(Number(b.dataset.verify))));
+  }
+
+  /* ============================== timeline ============================== */
+  function renderTimeline(history) {
+    document.getElementById('timeline').innerHTML = history.map((h, index) =>
+      '<li' + (index === 0 ? ' class="first"' : '') + '>' +
+      '<div><strong>' + (h.fromStatus ? h.fromStatus.replaceAll('_', ' ') + ' &rarr; ' : 'Created as ') +
+      h.toStatus.replaceAll('_', ' ') + '</strong></div>' +
+      '<div class="when">' + Layout.dateTime(h.changedAt) + ' &middot; ' + Layout.esc(h.changedBy) + '</div>' +
+      (h.remark ? '<div class="small">' + Layout.esc(h.remark) + '</div>' : '') +
+      '</li>').join('');
+  }
+
+  /* ============================== actions =============================== */
+  async function openAssign() {
+    document.getElementById('assign-form').reset();
+    document.getElementById('assign-message').innerHTML = '';
+    document.getElementById('a-target').min = new Date().toISOString().slice(0, 10);
+
+    const users = await API.get('/api/users?active=true');
+    Layout.fillSelect(document.getElementById('a-person'),
+      users.map(u => ({ value: u.userId, label: u.fullName + ' (' + Layout.roleLabel(u.role) + ')' })),
+      '', 'Choose a person...');
+    assignModal.show();
+  }
+
+  document.getElementById('assign-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!this.checkValidity()) { this.classList.add('was-validated'); return; }
+
+    try {
+      await API.post('/api/defects/' + defectId + '/corrective-actions', {
+        responsiblePersonId: Number(document.getElementById('a-person').value),
+        actionDescription: document.getElementById('a-description').value.trim(),
+        targetDate: document.getElementById('a-target').value
+      });
+      assignModal.hide();
+      Layout.showMessage('Corrective action assigned.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('assign-message').innerHTML =
+        '<div class="alert alert-danger">' + Layout.esc(error.message) + '</div>';
+    }
+  });
+
+  async function openProgress(actionId) {
+    progressActionId = actionId;
+    const action = detail.correctiveActions.find(a => a.actionId === actionId);
+    document.getElementById('progress-form').reset();
+    document.getElementById('progress-message').innerHTML = '';
+    document.getElementById('p-status').value = action.progressStatus;
+    document.getElementById('p-remark').value = action.progressRemark || '';
+    progressModal.show();
+  }
+
+  document.getElementById('progress-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    try {
+      await API.put('/api/corrective-actions/' + progressActionId + '/progress', {
+        progressStatus: document.getElementById('p-status').value,
+        progressRemark: document.getElementById('p-remark').value.trim() || null
+      });
+      progressModal.hide();
+      Layout.showMessage('Progress updated.', 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('progress-message').innerHTML =
+        '<div class="alert alert-danger">' + Layout.esc(error.message) + '</div>';
+    }
+  });
+
+  function openVerify(actionId) {
+    verifyActionId = actionId;
+    document.getElementById('verify-form').reset();
+    document.getElementById('verify-message').innerHTML = '';
+    verifyModal.show();
+  }
+
+  document.getElementById('verify-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!this.checkValidity()) { this.classList.add('was-validated'); return; }
+
+    try {
+      const result = await API.put('/api/corrective-actions/' + verifyActionId + '/verify', {
+        verificationStatus: document.getElementById('v-status').value,
+        verificationRemark: document.getElementById('v-remark').value.trim()
+      });
+      verifyModal.hide();
+      Layout.showMessage(
+        result.verificationStatus === 'NOT_EFFECTIVE'
+          ? 'Recorded as NOT_EFFECTIVE. This defect cannot be verified or closed until a further ' +
+            'corrective action is completed and verified effective (FR-08.10).'
+          : 'Recorded as EFFECTIVE. This defect may now be verified.',
+        result.verificationStatus === 'NOT_EFFECTIVE' ? 'warning' : 'success');
+      await load();
+    } catch (error) {
+      document.getElementById('verify-message').innerHTML =
+        '<div class="alert alert-danger">' + Layout.esc(error.message) + '</div>';
+    }
+  });
+
+  async function removeDefect() {
+    if (!window.confirm('Delete ' + detail.defect.defectRef + '?')) return;
+    try {
+      await API.del('/api/defects/' + defectId);
+      window.location.replace('defects.html');
+    } catch (error) {
+      Layout.showError(error);
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
