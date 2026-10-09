@@ -118,6 +118,58 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+
+            <!-- =================================================================
+                 SERVE THE FRONTEND FROM THIS SAME SERVER.
+
+                 WHY THIS IS HERE. The ten screens in ../frontend call the API with
+                 root-relative addresses ("/api/products", "/api/auth/login"). A
+                 root-relative address resolves against the ORIGIN of the page that
+                 made the call. So if the browser loads a screen from anywhere other
+                 than http://localhost:8080 - double-clicking the .html file, which
+                 gives it a file:// origin, or a "Live Server" on port 5500 - every
+                 one of those calls goes to the wrong place and every page renders
+                 empty. Opening the file directly also loses the JSESSIONID cookie,
+                 so the session cannot work at all.
+
+                 The single configuration that makes all ten screens work is to
+                 serve them from this application, on this port, so the page and the
+                 API share one origin and one cookie.
+
+                 WHAT IT DOES. On every build it copies ../frontend into
+                 target/classes/static (Spring Boot's default static folder), so
+                 http://localhost:8080/login.html is the same file as
+                 frontend/login.html. ../frontend stays the only copy you edit;
+                 nothing is duplicated in Git, and the copied files land in target/,
+                 which .gitignore already excludes.
+
+                 `tests` is excluded because frontend/tests holds the Node tools, not
+                 anything the browser needs.
+                 ================================================================= -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-frontend-into-static</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../frontend</directory>
+                                    <excludes>
+                                        <exclude>tests/**</exclude>
+                                    </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
